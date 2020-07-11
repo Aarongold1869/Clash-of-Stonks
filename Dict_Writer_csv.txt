@@ -1,0 +1,10 @@
+import csv
+
+with open('portfolio.csv', 'w', newline='') as f:
+	columns = ['date /time', 'stonks', '# of shares', 'price per share', 'current price', 'total value','cash', '% of portfolio']
+	csvwriter = csv.DictWriter(f, columns = columns)
+
+	csvwriter.writeheader()
+	csvwriter.writerow()
+
+
