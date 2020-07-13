@@ -4,7 +4,7 @@ from Clash_Functions import *
 def main():
     end_program = False
     while end_program == False:
-        print("Welcome to Clash of Stonks!")
+        print("\nWelcome to Clash of Stonks!")
         action = input("1. Login\n2. Create Account\n3. Exit\n(Type 1, 2, or 3): ")
         
         if action == "1":
@@ -14,6 +14,7 @@ def main():
             
         elif action == "2":
             UserID = userload()
+            continue 
         
         elif action == '3':
             end_program = True

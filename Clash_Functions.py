@@ -1,32 +1,38 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jul  3 17:11:09 2020
+Created on Fri Jul 3 17:11:09 2020
 
 @author: Aaron Goldstein
 """
 
-##pulls stonk data from Alpha Vantage API
+## subprocess allows user to access git bash and push code to online repository
+import subprocess
+
+## pulls stonk data from Alpha Vantage API
 import requests
 import alpha_vantage
-##Alpha_Vantage API Key
+## Alpha_Vantage API Key
 API_KEY = 'GFUV3575DL68NYGL'
-##command pulls data from AV API and uses Python Pandas to format data
+## command imports data from AV API and uses Python Pandas to format data
 from alpha_vantage.timeseries import TimeSeries
 ts = TimeSeries(API_KEY, output_format = 'pandas')
 
-##allows operation on JSON objects and files
+## allows operation on JSON objects and files
 import json
 
-##allows for creation of graphs and charts based on stonk data
+## allows for creation of graphs and charts based on stonk data
 import matplotlib.pyplot as plt
 
+## tabulate module formats specified data in print statement table
 from tabulate import tabulate 
     
+## module pulls date time data
 from datetime import datetime
 
+## pandas dataframe module for formatting data
 from pandas import DataFrame
 
-##conects to MySQL Database
+## conects to MySQL Database
 import mysql.connector
 db = mysql.connector.connect(
     host = "localhost",
@@ -34,61 +40,74 @@ db = mysql.connector.connect(
     passwd = "root",
     database = "stonkdb"
     )
-##iterates through MySQL data stored in tables
+## iterates through MySQL data stored in tables
 mycursor = db.cursor()
 
+## run command for git commit function
+def run(*args):
+    return subprocess.check_call(['git'] + list(args))
 
+## function selects project files and pushes them to github project repository
+def gitcommit():
+    message = input("\nType in your commit message: ")
+    commit_message = f'{message}'
+    
+    run("add .")
+    run("commit", "-am", commit_message)
+    run("push", "-u", "origin", "master")
+
+## describe mysql table(s) in stonkdb
 def describetable():
     mycursor.execute("DESCRIBE User_Balance")
     for x in mycursor: 
         print(x)
 
-
+## print mysql table(s) in stonkdb
 def printtables():
-    # mycursor.execute("SELECT * FROM portfolio")
-    # for x in mycursor:
-    #     print(x)
+    mycursor.execute("SELECT * FROM portfolio")
+    for x in mycursor:
+        print(x)
         
-    # mycursor.execute("SELECT * FROM User")
-    # for x in mycursor:
-    #     print(x)
-        
+    mycursor.execute("SELECT * FROM User")
+    for x in mycursor:
+        print(x)
+    
     mycursor.execute("SELECT * FROM User_Balance")
     for x in mycursor:
         print(x)
 
-
+## truncate portfolio table
 def trunkport():
     mycursor.execute("TRUNCATE TABLE stonkdb.portfolio")
     db.close()
 
-
+## truncate User_Balance table
 def trunkbal():
     mycursor.execute("TRUNCATE TABLE stonkdb.User_Balance")
     db.close()
 
-
+## truncate User table
 def trunkuser():
     mycursor.execute("SET FOREIGN_KEY_CHECKS = 0")
     mycursor.execute("TRUNCATE table stonkdb.User") 
     mycursor.execute("SET FOREIGN_KEY_CHECKS = 1")
     db.close
 
-
+## delete portfolio table
 def dropport():
     mycursor.execute("DROP TABLE stonkdb.portfolio")
     db.close()
 
-
+## delete user table
 def dropuser():
     mycursor.execute("SET FOREIGN_KEY_CHECKS = 0")
     mycursor.execute("DROP TABLE stonkdb.User") 
     mycursor.execute("SET FOREIGN_KEY_CHECKS = 1")
     db.close
 
-
+## retrieve user input for creating user account
 def userinfo():    
-    ##initial Paper trading amount
+    ## Set initial Cash Balance
     Cash = 200000
 
     first_name = input("What is your first name?: ")
@@ -99,6 +118,7 @@ def userinfo():
     user_name = input("Create a user name: ")
     password = input("Create a password: ")
     
+    # store user account info in list to be uploaded to mysql database
     User_info = [(first_name,
                   last_name,
                   age,
@@ -107,41 +127,57 @@ def userinfo():
                   user_name,
                   password,
                   Cash)]
-
-    Introduction = "Hey {}! You have ${} to invest. Let's get started!".format(user_name, Cash)
+    
+    # welcome message
+    Introduction = "\nHey {}! You have ${} to invest. Let's get started!".format(user_name, Cash)
     print(Introduction)
     
+    # return account info (to be used in userload function)
     return User_info
 
-
+## create user record in User table
 def userload():
+    # User data collected from userinfo function
     User_info = userinfo()
     
-    Cash = [(User_info[-1][-1],)]
+    # store Cash value in seperate variable
+    Cash = User_info[-1][-1]
+    # store User_name in seperate variable - used to retrieve UserID
     User_name = User_info[-1][-3]
-
-    info = []
+    
+    # create list containing all variables except Cash (Cash stored in portfolio table)
+    temp = []
     for x in User_info[0][:-1]:
-          info.append(x)
+          temp.append(x)
     
-    User_info = [tuple(info)]
+    ## format list data for db uplaod 
+    user_record =[(temp)]
     
+    # Query 1 Create user record in User table. Query 2 create record in Portfolio table (intial Cash Value) with FK UserID
     user_load = "INSERT INTO User (first_name, last_name, age, email, phone, user_name, password) VALUES(%s,%s,%s,%s,%s,%s,%s)"  
     Port_load = "INSERT INTO Portfolio (UserID, cash) VALUES (%s, %s)"
     
-    for x, user in enumerate(User_info):
+    # execute Query1 - create user record using user info list
+    for x, user in enumerate(user_record):
         mycursor.execute(user_load, user)  
-        last_id = mycursor.lastrowid
-        mycursor.execute(Port_load,(last_id,) + Cash[x])
-    db.commit()    
-    
+    db.commit()
+   
+    # retrieve UserID value (auto increment Int) from User record 
     mycursor.execute("SELECT UserID FROM User WHERE user_name = '{}'".format(User_name))
     for x in mycursor:
-        UserID = x[0]
+        UserID = x[0]   
+    
+    # store UserID and Cash variables in list 
+    new_record = [UserID, Cash]
         
+    # create portfolio record in database with UserID FK and initial Cash variable from new_record list
+    mycursor.execute(Port_load, new_record)
+    db.commit()    
+    
+    # Return UserID to main
     return UserID
     
-
+## allow existing user to login (return UserID to main)
 def login():
     
     Valid = True
@@ -171,94 +207,107 @@ def login():
             print("\nHey, {}!".format(User_name))
             return UserID
             
-
+## retreive purchase info from User input 
 def purchaseinfo(UserID):                            
     mycursor.execute("SELECT cash FROM Portfolio WHERE userID = {}".format(UserID))
     for x in mycursor:
-        Cash = x[0]
+        Cash = float(x[0])
     
-    while Cash > 0:  
+    invest = True
+    while invest == True:  
         ## retreive user input, retreive stonk data, display stonk data
-        Stonk = input("Insert a stonk ticker or type '%' to exit: ")
+        Stonk = input("Insert a stock ticker or type '%' to exit: ")
         Stonk.capitalize()
-        if Stonk != '%':
+        
+        if Stonk == '%':
+            invest = False
+            Port_Data = "false"
+            return Port_Data
+        
+        else:
             values_1, columns = ts.get_intraday(symbol = Stonk)
             values_1['4. close'].plot()
             plt.show()
             print(values_1)
-            
-        ##User doesnt want to invest 
-        else:
-            print('goodbye.')
-            break
         
         ## retrieves last market value of stock from array and converts to integer
-        Market = float(values_1['4. close'][0])
-        
-        ##while loop for viewing / purchasing a given stock
-        Buy = 'Y'
-        while Buy == 'Y':
+            Market = float(values_1['4. close'][0])
             
-            ##displays stock price of user requested sotck and asks for user input
-            Mkt_String = "{} is trading at ${}. Would you like to buy equity in {}?".format(Stonk, Market, Stonk)
+            ## displays stock price of user requested sotck and asks for user input
+            Mkt_String = "{} is trading at ${:0.2f}. Would you like to buy equity in {}?".format(Stonk, Market, Stonk)
             print(Mkt_String)
+            Action = input('1. Yes\n2. No\n')
             
-            ##user input - if user does not want to purchase stock, break while loop
-            Buy = input('Y / N: ')
-            Buy.capitalize()
-            if Buy == 'N':
-                break
-            
-            ##if user would like to purchase stock, display remaining money, get input on how many shares to purchase
-            else:   
-                Cash_string = "You have ${}".format(Cash)
-                print(Cash_string)
-        
-                Shares = int(input("How many shares would you like to buy? Enter # of shares: "))
-                invest = int(Shares * Market)
-                
-                
-                ##if user can afford number of shares requeste
-                if Cash - invest > 0:
-                    ##subtract shares purchased from cash
-                    Cash = int(Cash - invest)
-                      
-                    ##display user equit
-                    Equity_String = "You own {} share(s) of {} Congratulations!".format(Shares,Stonk)
-    
-                    ##display remaining investable cash
-                    Cash_String = "you have ${} left to invest".format(Cash)
-                    print(Equity_String, Cash_String)
-                    
-                    from datetime import datetime
-                    now = datetime.now()
-                    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
-                    
-                    Port_Data = [(UserID,
-                                  dt_string,
-                                  Stonk,
-                                  Shares, 
-                                  Market, 
-                                  Market, 
-                                  invest, 
-                                  Cash)]
-                    
-                    return Port_Data
+            Buy = True
+            while Buy == True:
+                ## user input - if user does not want to purchase stock, break while loop    
                
-                else:
-                    ##alert user of insufficient funds
-                    print('You dont have enough money.')
-                    ## start loop over 
-                    continue
+                ##if user would like to purchase stock, display remaining money, get input on how many shares to purchase
+                if Action =='1':   
+                    Cash_string = "You have ${:0.2f}".format(Cash)
+                    print(Cash_string)
+            
+                    Shares = int(input("How many shares would you like to buy? Enter # of shares:\npress '0' to cancel\n"))
                     
-
+                    if Shares != 0:
+                        invest = float(Shares * Market)
+                   
+                    ##if user can afford number of shares requeste
+                        
+                        if (Cash - invest) > 0:
+                            ##subtract shares purchased from cash
+                            Cash = float(Cash - invest)
+                              
+                            ##display user equit
+                            Equity_String = "\nYou own {} share(s) of {} Congratulations!".format(Shares,Stonk)
+                
+                            ##display remaining investable cash
+                            Cash_String = "you have ${:0.2f} left to invest\n".format(Cash)
+                            print(Equity_String, Cash_String)
+                            
+                            from datetime import datetime
+                            now = datetime.now()
+                            dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
+                            
+                            Port_Data = [(UserID,
+                                          dt_string,
+                                          Stonk,
+                                          Shares, 
+                                          Market, 
+                                          Market, 
+                                          invest, 
+                                          Cash)]
+                            
+                            return Port_Data
+                          
+                        else:
+                            ##alert user of insufficient funds
+                            print('\nYou dont have enough money.')
+                            ## start loop over 
+                            continue
+                        continue
+                        
+                    else:
+                        break
+                    
+                    
+                elif Action == '2':
+                   break
+                break
+            continue
+        
+## create purchase record in Portfolio database 
 def portload(UserID):
-    Port_Data = purchaseinfo(UserID)    
+    Port_Data = purchaseinfo(UserID)
     
-    Port_load = "INSERT INTO Portfolio (UserID, date_time, stonks, shares, cost, mkt_price, total_val, cash) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"   
-    for x, data in enumerate(Port_Data):
-        mycursor.execute(Port_load, data)
-    db.commit()
+    if Port_Data == 'false':
+        print("\nNo purchase was made\n")
+        
+    else:
+        Port_load = "INSERT INTO Portfolio (UserID, date_time, stonks, shares, cost, mkt_price, total_val, cash) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"   
+        for x, data in enumerate(Port_Data):
+            mycursor.execute(Port_load, data)
+        db.commit()
     
     
 def portview(UserID):
@@ -304,7 +353,7 @@ def portview(UserID):
         #total all shares associated with a given stonk from each purchase order / sell order portfolio row
         total_shares = float(sum(sharelist))
         #Total Equity (current) = number of shares times current market value 
-        Equity = total_shares * Market
+        Equity = float(total_shares * Market)
         
         #create list for storing investment costs by stock by purchase order
         cost_list = []
@@ -317,9 +366,9 @@ def portview(UserID):
         #sum all purchase costs to get total investment for a given stock - assign to variable "Cost"
         Cost = float(sum(cost_list))
         #avg cost for a given stonk is Total investment Cost / Total shares 
-        avg_cost = Cost / total_shares
+        avg_cost = float(Cost / total_shares)
         #Profit by stock = total Current equity - Total intitial investment cost
-        profit = Equity - Cost
+        profit = float(Equity - Cost)
         #percent return for a given stock = Equity / cost -1 *100
         percent = ((Equity / Cost)-1) * 100
         
@@ -376,10 +425,11 @@ def portview(UserID):
     df['Balance'] = df['Balance'].astype(float)
     df.plot(x = 'Date', y = 'Balance')
     plt.show()
-    print("\nBalance: ${:0.2f}\nProfit/Loss: ${:0.2f}\nPecent Return: {:0.4f}%".format(Balance, Profit, Return))
+    print("\nCurrent Balance: ${:0.2f}\nTotal Profit/Loss: ${:0.2f}\nTotal Pecent Return: {:0.4f}%".format(Balance, Profit, Return))
 
 
 # def sell(UserID):
+    
     
 def rank():
     
@@ -409,3 +459,4 @@ def rank():
 # trunkbal()
 # describetable()
 
+# gitcommit()
