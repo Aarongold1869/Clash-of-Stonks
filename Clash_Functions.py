@@ -5,9 +5,6 @@ Created on Fri Jul 3 17:11:09 2020
 @author: Aaron Goldstein
 """
 
-## subprocess allows user to access git bash and push code to online repository
-import subprocess
-
 ## pulls stonk data from Alpha Vantage API
 import requests
 import alpha_vantage
@@ -43,22 +40,9 @@ db = mysql.connector.connect(
 ## iterates through MySQL data stored in tables
 mycursor = db.cursor()
 
-## run command for git commit function
-def run(*args):
-    return subprocess.check_call(['git'] + list(args))
-
-## function selects project files and pushes them to github project repository
-def gitcommit():
-    message = input("\nType in your commit message: ")
-    commit_message = f'{message}'
-    
-    run("add .")
-    run("commit", "-am", commit_message)
-    run("push", "-u", "origin", "master")
-
 ## describe mysql table(s) in stonkdb
 def describetable():
-    mycursor.execute("DESCRIBE User_Balance")
+    mycursor.execute("DESCRIBE Portfolio")
     for x in mycursor: 
         print(x)
 
@@ -68,13 +52,13 @@ def printtables():
     for x in mycursor:
         print(x)
         
-    mycursor.execute("SELECT * FROM User")
-    for x in mycursor:
-        print(x)
+    # mycursor.execute("SELECT * FROM User")
+    # for x in mycursor:
+    #     print(x)
     
-    mycursor.execute("SELECT * FROM User_Balance")
-    for x in mycursor:
-        print(x)
+    # mycursor.execute("SELECT * FROM User_Balance")
+    # for x in mycursor:
+    #     print(x)
 
 ## truncate portfolio table
 def trunkport():
@@ -216,8 +200,7 @@ def purchaseinfo(UserID):
     invest = True
     while invest == True:  
         ## retreive user input, retreive stonk data, display stonk data
-        Stonk = input("Insert a stock ticker or type '%' to exit: ")
-        Stonk.capitalize()
+        Stonk = input("Insert a stock ticker or type '%' to cancel: ")
         
         if Stonk == '%':
             invest = False
@@ -309,7 +292,7 @@ def portload(UserID):
             mycursor.execute(Port_load, data)
         db.commit()
     
-    
+## View user portfolio data 
 def portview(UserID):
     #pull the last cash value stored in the Portfolio table
     mycursor.execute("SELECT cash FROM Portfolio WHERE userID = {}".format(UserID))
@@ -425,12 +408,87 @@ def portview(UserID):
     df['Balance'] = df['Balance'].astype(float)
     df.plot(x = 'Date', y = 'Balance')
     plt.show()
-    print("\nCurrent Balance: ${:0.2f}\nTotal Profit/Loss: ${:0.2f}\nTotal Pecent Return: {:0.4f}%".format(Balance, Profit, Return))
+    print("\nCurrent Balance: ${:0.2f}\nTotal Profit/Loss: ${:0.2f}\nTotal Pecent Return: {:0.4f}%\n".format(Balance, Profit, Return))
 
+## retreive sell info from User input
+def sellinfo(UserID):   
+    Sell = True
+    while Sell == True: 
+        
+        stonk_sell = input("Which stock would you like to sell?\n(Insert stock ticker. Press '%' to cancel.):")
+        
+        if stonk_sell == '%':
+            Sell = False
+            Sell_Data = "false"
+            return Sell_Data
+        
+        else:
+            mycursor.execute("SELECT cash FROM Portfolio WHERE userID = {}".format(UserID))
+            for x in mycursor:
+                #assign most recent cash value to variable 'Cash'
+                Cash = float(x[-1])
+            
+            value, columns = ts.get_intraday(symbol = stonk_sell)
+            value['4. close']
+            Market_sell = float(value['4. close'][0])
+            
+            shares_sell = int(input("{} is trading at ${}. How many shares would you like to sell?\n(Type '0' to cancel.)".format(stonk_sell, Market_sell)))
+            
+            Sell_Clause = True
+            while Sell_Clause == True:
+    
+                if shares_sell != 0: 
+                    debit = float(shares_sell * Market_sell)
+                    Cash = Cash + debit
+                    
+                    print("\nCongrats! You sold {} shares of {} for a debit to your account of ${}.\n".format(shares_sell, stonk_sell, debit))
+                
+                    shares_sell = (shares_sell * (-1))
+                    debit = (debit * (-1))
+                    
+                    mycursor.execute("SELECT total_val FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, stonk_sell))
+                    for x in mycursor:
+                        #append purchase costs to list 
+                        cost_list.append(x[-1])
+                    
+                    #sum all purchase costs to get total investment for a given stock - assign to variable "Cost"
+                    Cost = float(sum(cost_list))
+                    #avg cost for a given stonk is Total investment Cost / Total shares 
+                    avg_cost = float(Cost / total_shares)
+                    
+                    now = datetime.now()
+                    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
+                    
+                    Sell_Data = [(UserID,
+                                  dt_string,
+                                  stonk_sell,
+                                  shares_sell, 
+                                  avg_cost, 
+                                  Market_sell, 
+                                  debit, 
+                                  Cash)]
+                        
+                    return Sell_Data
+                
+                else:
+                    Sell = False
+                    Sell_Data = "false"
+                    return Sell_Data
+               
+## create sell record in Portfolio database
+def sell_load(UserID):
+    Sell_Data = sellinfo(UserID)
+    
+    if Sell_Data == 'false':
+        print("\nNo sale was made\n")
+        
+    else:
+        Sell_load = "INSERT INTO Portfolio (UserID, date_time, stonks, shares, cost, mkt_price, total_val, cash) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"   
+        for x, data in enumerate(Sell_Data):
+            mycursor.execute(Sell_load, data)
+        db.commit()
 
-# def sell(UserID):
-    
-    
+## view all users ranked on portfolio performance 
 def rank():
     
     id_list =[]
@@ -459,4 +517,3 @@ def rank():
 # trunkbal()
 # describetable()
 
-# gitcommit()
