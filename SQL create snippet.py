@@ -20,12 +20,15 @@ mycursor = db.cursor()
 # mycursor.execute("CREATE TABLE Portfolio (portID int PRIMARY KEY AUTO_INCREMENT, userID int, FOREIGN KEY(userID) REFERENCES User(userID), date_time DATETIME, stonks VARCHAR(100), shares VARCHAR(100), cost VARCHAR(100), mkt_price VARCHAR(100), total_val int UNSIGNED, perc_port decimal UNSIGNED)")
 
 
-# mycursor.execute("SET SQL_SAFE_UPDATES = 0")
-mycursor.execute("SELECT * FROM Portfolio WHERE UserID = 1 ORDER BY PortID DESC LIMIT 1")
-# mycursor.execute("SET SQL_SAFE_UPDATES = 1")
+mycursor.execute("ALTER TABLE User ADD COLUMN date_time DATETIME")
 
-for x in mycursor:
-    print(x)
+
+# mycursor.execute("SET SQL_SAFE_UPDATES = 0")
+# mycursor.execute("SELECT * FROM Portfolio WHERE UserID = 1 ORDER BY PortID DESC LIMIT 1")
+# # mycursor.execute("SET SQL_SAFE_UPDATES = 1")
+
+# for x in mycursor:
+#     print(x)
 
     
 # mycursor.execute("ALTER TABLE User_Balance MODIFY COLUMN Equity DECIMAL(10,2)")

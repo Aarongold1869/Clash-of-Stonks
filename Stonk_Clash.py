@@ -14,7 +14,6 @@ def main():
             
         elif action == "2":
             UserID = userload()
-            continue 
         
         elif action == '3':
             end_program = True
@@ -30,23 +29,25 @@ def main():
             print("\n")
             
             if action == '1':
-                portview(UserID)
-                portload(UserID)
                 # portview(UserID)
+                purchaseload(UserID)
+                
                 continue
         
             if action == '2':
-                portview(UserID)
-                sell_load(UserID)
                 # portview(UserID)
+                sell_load(UserID)
+                
                 continue
             
             if action == '3':
-                portview(UserID)
+                port_display(UserID)
+                
                 continue
                 
             if action == '4':
                 rank()
+                
                 continue
                 
             if action == '5':
