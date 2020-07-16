@@ -26,7 +26,6 @@ def main():
         while logout == False:
             print("What would you like to do?")
             action = input("1. buy\n2. sell\n3. view portfolio\n4. view leaderboard \n5. update account info\n6. logout\n(select an option): ")
-            print("\n")
             
             if action == '1':
                 # portview(UserID)
