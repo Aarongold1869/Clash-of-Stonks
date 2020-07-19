@@ -51,23 +51,23 @@ mycursor = db.cursor()
 
 ## describe mysql table(s) in stonkdb
 def describetable():
-    mycursor.execute("DESCRIBE User_Balance")
+    mycursor.execute("DESCRIBE User")
     for x in mycursor: 
         print(x)
 
 ## print mysql table(s) in stonkdb
 def printtables():
-    mycursor.execute("SELECT * FROM portfolio")
-    for x in mycursor:
-        print(x,"\n")
+    # mycursor.execute("SELECT * FROM portfolio")
+    # for x in mycursor:
+    #     print(x,"\n")
         
     mycursor.execute("SELECT * FROM User")
     for x in mycursor:
         print(x,"\n")
     
-    mycursor.execute("SELECT * FROM User_Balance")
-    for x in mycursor:
-        print(x)
+    # mycursor.execute("SELECT * FROM User_Balance")
+    # for x in mycursor:
+    #     print(x)
 
 ## truncate portfolio table
 def trunkport():
@@ -614,7 +614,7 @@ def port_load(UserID):
     tablist = data[2]
     graph = data[3]
              
-      
+    mycursor.execute("set innodb_lock_wait_timeout=1000")
     b_load = "INSERT INTO User_Balance (UserID, date_time, Equity, Cash, Balance, percent_return) VALUES (%s, %s, %s, %s, %s, %s)"   
     for x, data in enumerate(load_list):
         mycursor.execute(b_load, data)
@@ -625,7 +625,7 @@ def port_load(UserID):
 
 ## display portfolio / balance data
 def port_display(UserID):
-    print("loading, this may take a moment...\n")
+    print("\nloading...\n")
     
     data = port_load(UserID)
     b_list = data[1]
@@ -651,51 +651,116 @@ def port_display(UserID):
     Return = float(b_list[2])
     print("\nCurrent Balance: ${:0.2f}\nTotal Profit/Loss: ${:0.2f}\nTotal Pecent Return: {:0.4f}%\n".format(Balance, Profit, Return))
     
+    
 
-
-## view all users ranked on portfolio performance 
-def rankinfo():
+def rank_info():
+    
+    print("\nLoading...\n")
     
     id_list =[]
     mycursor.execute("SELECT UserID FROM User")
     for x in mycursor:
         id_list.append(x[-1])
     
-    rank_list = []
+    ##########################################################################
+    ## REFRESH BALANCE DATA FOR EVERY USER  IN SYSTEM....  ###################
+    ## MORE ACCURATE REANKING, MAKES PROGRAM RUN SLOW AF...###################
+        
+    for ID in id_list:
+        port_load(ID)
+        
+    #########################################################################
+    
+    Balance_list = []
     for ID in id_list:
         mycursor.execute("SELECT User.user_name, User_Balance.Balance, User_Balance.percent_return FROM User, User_Balance WHERE User.UserID ={} AND User_Balance.UserID = {} ORDER BY balID DESC LIMIT 1".format(ID,ID))
         for x in mycursor:
-            rank_list.append(x)
-            
-    # print(rank_list)
-    table = tabulate(rank_list, headers=["User", "Balance", "Total Return"], tablefmt='orgtbl')
-    print(table)
-# def rankload():
-# def rankdisplay():
+            l = [ID, x]
+            Balance_list.append(l)
+     
+    # print(Balance_list)
+    return Balance_list
+
+
+def rank_sort():  
     
+    tup = rank_info()
+    tup.sort(key = lambda x: x[1][2], reverse = True)
+        
+    import math
+    ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(math.floor(n/10)%10!=1)*(n%10<4)*n%10::4])
+    rank = ([ordinal(n) for n in range(1,100)])
+    n = 0
+    
+    rank_list = []
+    load_list = []
+    for x in tup:
+        UserID = x[0]
+        user_name = x[1][0]
+        Balance = x[1][1]
+        Return = x[1][2]
+        Rank = rank[n]
+        
+        l = [user_name, Balance, Return, Rank]
+        m = [UserID, Rank]
+        rank_list.append(l)
+        load_list.append(m)
+        n +=1
+        
+    return rank_list, load_list 
+
+
+def rank_load():
+        
+    Data = rank_sort()
+    rank_list = Data[0]
+    load_list = Data[1]
+    
+    mycursor.execute("set innodb_lock_wait_timeout=1000")
+    for x in load_list:
+        UserID = x[0]
+        Rank = x[1]
+        mycursor.execute("UPDATE User SET Ranking = '{}' WHERE UserID = {}".format(Rank, UserID))
+    db.commit 
+    
+    
+    return rank_list
+    
+    
+def rank_display():
+    
+    Data = rank_load()
+    
+    rank_list = []
+    for x in Data:      
+        user_name = x[0]
+        Balance = float(x[1])
+        Return = float(x[2])
+        Rank = x[3]
+        l = [user_name, "${:0.2f}".format(Balance), "{:0.4f}%".format(Return), Rank]
+        rank_list.append(l)
+    
+    
+    print("\n")    
+    table = tabulate(rank_list, headers=["User", "Balance", "% Return", "Rank"], tablefmt='orgtbl')
+    print(table,"\n")
     
 
+
 def test():
-    UserID = 4
-    Port_info = port_info(UserID)
-    Balance_Data = purchaseinfo(UserID)[1][0]
-        
-    Old_Equity = Port_info[0][0][2]
-    datetime = Port_info[0][0][1]
-    Return = Port_info[0][0][5]
+    mycursor.execute("set innodb_lock_wait_timeout=1000")
+
+    Data = rank_sort()
+    rank_list = Data[0]
+    load_list = Data[1]
     
-    New_Equity = Balance_Data[2] 
-    New_Cash = Balance_Data[3]
-    
-    Total_Equity = Old_Equity + New_Equity
-    Cash = New_Cash
-    Balance = Total_Equity + Cash
-    
-    new_record = [(UserID, datetime, Total_Equity, Cash, Balance, Return)]
-    
-    print(new_record)
+    print(rank_list)
+    print(load_list)
+
+
     
     
+# rank_display()
 # test()
 
 # userload()

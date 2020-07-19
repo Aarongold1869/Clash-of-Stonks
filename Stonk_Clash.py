@@ -45,7 +45,7 @@ def main():
                 continue
                 
             if action == '4':
-                rank()
+                rank_display()
                 
                 continue
                 

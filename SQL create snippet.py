@@ -24,15 +24,17 @@ mycursor = db.cursor()
 
 
 # mycursor.execute("SET SQL_SAFE_UPDATES = 0")
-# mycursor.execute("SELECT * FROM Portfolio WHERE UserID = 1 ORDER BY PortID DESC LIMIT 1")
+mycursor.execute("SELECT percent_return FROM User_Balance WHERE UserID = 3 ORDER BY balID DESC LIMIT 1")
+for x in mycursor:
+    print(x)
 # # mycursor.execute("SET SQL_SAFE_UPDATES = 1")
 
 # for x in mycursor:
 #     print(x)
 
 
-mycursor.execute("ALTER TABLE User_Balance MODIFY COLUMN Cash DECIMAL(10,2)")
-db.close
+# mycursor.execute("ALTER TABLE User_Balance MODIFY COLUMN percent_return DECIMAL(10,4)")
+# db.close
 
 # mycursor.execute("ALTER TABLE User ADD Rank INT NOT NULL AFTER p;")
 # db.close
