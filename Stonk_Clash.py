@@ -50,6 +50,7 @@ def main():
                 continue
                 
             if action == '5':
+                update_user(UserID)
                 
                 continue
                 

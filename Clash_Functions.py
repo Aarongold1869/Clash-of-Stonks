@@ -15,9 +15,6 @@ API_KEY = 'GFUV3575DL68NYGL'
 from alpha_vantage.timeseries import TimeSeries
 ts = TimeSeries(API_KEY, output_format = 'pandas')
 
-from ratelimit import limits, sleep_and_retry
-ONE_MINUTE = 60
-
 ## allows operation on JSON objects and files
 import json
 
@@ -35,6 +32,8 @@ from time import sleep
 
 ## pandas dataframe module for formatting data
 from pandas import DataFrame
+
+import re
 
 ## conects to MySQL Database
 import mysql.connector
@@ -108,16 +107,49 @@ def userinfo():
 
     first_name = input("What is your first name?: ")
     last_name = input("What is your last name?: ")
-    age = input("What is your age?: ")
-    email = input("What is your email?: ")
-    phone = input("What is your phone?: ")
-    user_name = input("Create a user name: ")
+    
+    while True:
+        DOB = input("What is your date of birth (MM/DD/YYYY)?: ")
+        valid_DOB = check_DOB(DOB)
+        
+        if valid_DOB == False:
+            print("\nplease enter a valid birthdate (with slashes).")
+            continue
+        else:
+            DOB = datetime.strptime(DOB, "%m/%d/%Y")
+        break
+    
+    while True:
+        email = input("What is your email?: ")
+        valid = check_email(email)
+        if valid == 'False':
+            print("\nplease enter a vaild email address.")
+            continue
+        break
+    
+    while True:
+        phone = input("What is your phone?: ")
+        phone = '{}-{}-{}'.format(phone[0:3], phone[3:6], phone[6:])
+        valid = check_phone(phone)
+        if valid == False:
+            print("\nplease enter a vaild phone number.")
+            continue
+        break
+    
+    while True:
+         user_name = input("Create a user name: ")
+         valid = check_user_name(user_name)
+         if valid == False:
+             print("user name '{}' taken.".format(user_name))
+             continue
+         break
+    
     password = input("Create a password: ")
     
     # store user account info in list to be uploaded to mysql database
     User_info = [(first_name,
                   last_name,
-                  age,
+                  DOB,
                   email,
                   phone,
                   user_name,
@@ -128,7 +160,6 @@ def userinfo():
     Introduction = "\nHey {}! You have ${} to invest. Let's get started!".format(user_name, Cash)
     print(Introduction)
     
-    # return account info (to be used in userload function)
     return User_info
 
 ## create user record in User table
@@ -154,7 +185,7 @@ def userload():
     user_record =[(temp)]
     
     # Query 1 Create user record in User table. Query 2 create record in Portfolio table (intial Cash Value) with FK UserID
-    user_load = "INSERT INTO User (first_name, last_name, age, email, phone, user_name, password, date_time) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)"  
+    user_load = "INSERT INTO User (first_name, last_name, DOB, email, phone, user_name, password, date_time) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)"  
     
     # execute Query1 - create user record using user info list
     for x, user in enumerate(user_record):
@@ -681,7 +712,6 @@ def rank_info():
     # print(Balance_list)
     return Balance_list
 
-
 def rank_sort():  
     
     tup = rank_info()
@@ -709,23 +739,23 @@ def rank_sort():
         
     return rank_list, load_list 
 
-
 def rank_load():
         
     Data = rank_sort()
     rank_list = Data[0]
     load_list = Data[1]
     
+    mycursor.execute("SET SQL_SAFE_UPDATES = 0")
     mycursor.execute("set innodb_lock_wait_timeout=1000")
     for x in load_list:
         UserID = x[0]
         Rank = x[1]
         mycursor.execute("UPDATE User SET Ranking = '{}' WHERE UserID = {}".format(Rank, UserID))
     db.commit 
-    
+    mycursor.execute("SET SQL_SAFE_UPDATES = 1")
+
     
     return rank_list
-    
     
 def rank_display():
     
@@ -747,20 +777,194 @@ def rank_display():
     
 
 
+def update_user(UserID):
+    action = input("\n1. update email\n2. update phone number\n3. reset password\n4. exit \n(select an option): ")
+        
+    if action == "1":
+        return_statement = update_email(UserID)
+        print("\n",return_statement,"\n")
+        
+    if action == "2":
+        return_statement = update_phone(UserID)
+        print("\n",return_statement,"\n")     
+        
+    if action == '3':
+        return_statement = update_pw(UserID)
+        print("\n",return_statement,"\n")
+        
+    if action == '4':
+        return 
+
+def update_email(UserID):
+    
+    while True:
+        
+        new_email = input("Enter email address:\n(type '%' to cancel): ")
+        if new_email != '%':
+        
+            valid = check_email(new_email)
+            if valid == 'False':
+                print("\nplease enter a vaild email address.")
+                continue
+                
+            verify_email = input("Verify email address: ")
+        
+            if new_email == verify_email:
+                mycursor.execute("SET SQL_SAFE_UPDATES = 0")
+                mycursor.execute("UPDATE USER SET email = '{}' WHERE UserID = {}".format(new_email, UserID))
+                mycursor.execute("SET SQL_SAFE_UPDATES = 1")
+                db.commit()
+                
+                return_statement = "email updated successfully"
+                return return_statement
+    
+            else:
+                print("\nemails do not match.")
+                action = input("1. try again\n2. exit\n")
+                
+                if action == "1":
+                    continue
+                
+                if action == "2":
+                    return_statement = "email address not updated"
+                    return return_statement
+        
+        elif new_email == '%':
+            return_statement = "email address not updated"
+            return return_statement 
+
+def update_phone(UserID):
+    
+    while True:
+        
+        new_value = input("Enter phone number:\n(type '%' to cancel): ")
+        if new_value != '%':
+            
+            new_value = '{}-{}-{}'.format(new_value[0:3], new_value[3:6], new_value[6:])
+            valid = check_phone(new_value)
+            if valid == False:
+                print("\nplease enter a vaild phone number.")
+                continue
+            
+            verify_value = input("Verify phone number: ")
+            verify_value = '{}-{}-{}'.format(verify_value[0:3], verify_value[3:6], verify_value[6:])
+        
+            if new_value == verify_value:
+                mycursor.execute("SET SQL_SAFE_UPDATES = 0")
+                mycursor.execute("UPDATE USER SET phone = '{}' WHERE UserID = {}".format(new_value, UserID))
+                mycursor.execute("SET SQL_SAFE_UPDATES = 1")
+                db.commit()
+                
+                return_statement = "phone number updated successfully"
+                return return_statement
+    
+            else:
+                print("\nphone numbers do not match.")
+                action = input("1. try again\n2. exit\n")
+                
+                if action == "1":
+                    continue
+                
+                if action == "2":
+                    return_statement = "phone number not updated"
+                    return return_statement
+        
+        elif new_value == '%':
+            return_statement = "phone number not updated"
+            return return_statement 
+
+def update_pw(UserID):
+    
+    while True:
+        
+        old_value = input("Enter current password:\n(type '%' to cancel): ")
+        
+        if old_value == '%':
+            return_statement = "password not updated"
+            return return_statement         
+        
+        else:
+            mycursor.execute("SELECT password FROM USER WHERE UserID = {}".format(UserID))
+            for x in mycursor:
+                value_check = x[0]
+            
+            if old_value != value_check:
+                print("\nincorrect password")
+                continue
+            
+            else:
+            
+               while True:
+        
+                    new_value = input("Enter new password: ")
+                    verify_value = input("Verify password: ")
+                
+                    if new_value == verify_value:
+                        mycursor.execute("SET SQL_SAFE_UPDATES = 0")
+                        mycursor.execute("UPDATE USER SET password = '{}' WHERE UserID = {}".format(new_value, UserID))
+                        mycursor.execute("SET SQL_SAFE_UPDATES = 1")
+                        db.commit()
+                        
+                        return_statement = "password updated successfully"
+                        return return_statement
+            
+                    else:
+                        print("\npasswords do not match.")
+                        action = input("1. try again\n2. exit\n")
+                        
+                        if action == "1":
+                            continue
+                        
+                        if action == "2":
+                            return_statement = "password not updated"
+                            return return_statement   
+    
+    
+    
+def check_email(email):
+
+    regex = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'
+
+    if(re.search(regex,email)):  
+        return "True" 
+          
+    else:  
+        return "False" 
+
+def check_phone(phone):
+    
+    pattern = re.compile("^[\dA-Z]{3}-[\dA-Z]{3}-[\dA-Z]{4}$", re.IGNORECASE)
+    return pattern.match(phone) is not None
+    
+def check_user_name(user_name):
+    
+    mycursor.execute("SELECT user_name FROM User")
+        
+    while True:
+        for x in mycursor:
+            if x[0] == user_name:
+                return False
+        
+        return True
+
+def check_DOB(DOB):
+    
+   try:
+       datetime.strptime(DOB,"%m/%d/%Y")
+   except ValueError as err:
+       return False
+           
+   return True
+      
+ 
 def test():
-    mycursor.execute("set innodb_lock_wait_timeout=1000")
-
-    Data = rank_sort()
-    rank_list = Data[0]
-    load_list = Data[1]
-    
-    print(rank_list)
-    print(load_list)
-
-
+    DOB = ("07/27/1995")
+    DOB = datetime.strptime(DOB, "%m/%d/%Y")
+    print(DOB)
     
     
-# rank_display()
+    
+# update_phone()
 # test()
 
 # userload()

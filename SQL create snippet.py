@@ -23,11 +23,10 @@ mycursor = db.cursor()
 # mycursor.execute("ALTER TABLE User ADD COLUMN date_time DATETIME")
 
 
-# mycursor.execute("SET SQL_SAFE_UPDATES = 0")
-mycursor.execute("SELECT percent_return FROM User_Balance WHERE UserID = 3 ORDER BY balID DESC LIMIT 1")
-for x in mycursor:
-    print(x)
-# # mycursor.execute("SET SQL_SAFE_UPDATES = 1")
+mycursor.execute("SET SQL_SAFE_UPDATES = 0")
+mycursor.execute("ALTER TABLE User DROP age")
+mycursor.execute("ALTER TABLE USER ADD DOB DATE AFTER last_name")
+mycursor.execute("SET SQL_SAFE_UPDATES = 1")
 
 # for x in mycursor:
 #     print(x)
