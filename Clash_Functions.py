@@ -46,7 +46,7 @@ db = mysql.connector.connect(
     database = "stonkdb"
     )
 ## iterates through MySQL data stored in tables
-mycursor = db.cursor()
+mycursor = db.cursor(buffered=True)
 
 ##############################################################################
 ##############################################################################
