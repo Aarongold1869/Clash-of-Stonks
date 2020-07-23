@@ -25,16 +25,16 @@ def main():
         logout = False 
         while logout == False:
             print("What would you like to do?")
-            action = input("1. buy\n2. sell\n3. view portfolio\n4. view leaderboard \n5. update account info\n6. logout\n(select an option): ")
+            action = input("1. buy\n2. sell\n3. view portfolio\n4. view leaderboard \n5. Awards \n6. update account info\n7. logout\n(select an option): ")
             
             if action == '1':
-                # portview(UserID)
-                purchaseload(UserID)
+                port_display(UserID)
+                purchase_load(UserID)
                 
                 continue
         
             if action == '2':
-                # portview(UserID)
+                port_display(UserID)
                 sell_load(UserID)
                 
                 continue
@@ -50,17 +50,22 @@ def main():
                 continue
                 
             if action == '5':
+                awards_menu(UserID)
+                
+                continue
+               
+            if action == '6':
                 update_user(UserID)
                 
                 continue
                 
-            if action == '6':
-                
+            if action == '7':
                 logout = True 
                 break
-            break
+            
+            else: 
+                continue
 
-        
         
 if __name__ == "__main__":
     main()

@@ -35,6 +35,8 @@ from pandas import DataFrame
 
 import re
 
+from termcolor import colored
+
 ## conects to MySQL Database
 import mysql.connector
 db = mysql.connector.connect(
@@ -46,64 +48,13 @@ db = mysql.connector.connect(
 ## iterates through MySQL data stored in tables
 mycursor = db.cursor()
 
-
-
-## describe mysql table(s) in stonkdb
-def describetable():
-    mycursor.execute("DESCRIBE User")
-    for x in mycursor: 
-        print(x)
-
-## print mysql table(s) in stonkdb
-def printtables():
-    # mycursor.execute("SELECT * FROM portfolio")
-    # for x in mycursor:
-    #     print(x,"\n")
-        
-    mycursor.execute("SELECT * FROM User")
-    for x in mycursor:
-        print(x,"\n")
+##############################################################################
+##############################################################################
     
-    # mycursor.execute("SELECT * FROM User_Balance")
-    # for x in mycursor:
-    #     print(x)
-
-## truncate portfolio table
-def trunkport():
-    mycursor.execute("TRUNCATE TABLE stonkdb.portfolio")
-    db.close()
-
-## truncate User_Balance table
-def trunkbal():
-    mycursor.execute("TRUNCATE TABLE stonkdb.User_Balance")
-    db.close()
-
-## truncate User table
-def trunkuser():
-    mycursor.execute("SET FOREIGN_KEY_CHECKS = 0")
-    mycursor.execute("TRUNCATE table stonkdb.User") 
-    mycursor.execute("SET FOREIGN_KEY_CHECKS = 1")
-    db.close
-
-## delete portfolio table
-def dropport():
-    mycursor.execute("DROP TABLE stonkdb.portfolio")
-    db.close()
-
-## delete user table
-def dropuser():
-    mycursor.execute("SET FOREIGN_KEY_CHECKS = 0")
-    mycursor.execute("DROP TABLE stonkdb.User") 
-    mycursor.execute("SET FOREIGN_KEY_CHECKS = 1")
-    db.close
-
-
-
-
-## retrieve user input for creating user account
-def userinfo():    
+# retrieve user input for creating user account
+def user_info():    
     ## Set initial Cash Balance
-    Cash = 200000
+    Cash = 200000.00
 
     first_name = input("What is your first name?: ")
     last_name = input("What is your last name?: ")
@@ -146,6 +97,9 @@ def userinfo():
     
     password = input("Create a password: ")
     
+    now = datetime.now()
+    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
+    
     # store user account info in list to be uploaded to mysql database
     User_info = [(first_name,
                   last_name,
@@ -154,66 +108,50 @@ def userinfo():
                   phone,
                   user_name,
                   password,
-                  Cash)]
+                  dt_string)]
     
     # welcome message
-    Introduction = "\nHey {}! You have ${} to invest. Let's get started!".format(user_name, Cash)
+    Introduction = "\nHey {}! You have ${:0.2f} to invest. Let's get started!".format(user_name, Cash)
     print(Introduction)
     
     return User_info
 
-## create user record in User table
-def userload():
-    # User data collected from userinfo function
-    User_info = userinfo()
+# create user record in User table
+def user_load():
+
+    user_record = user_info()
+    user_name = user_info[-1][-2]
     
-    # store Cash value in seperate variable
-    Cash = User_info[-1][-1]
-    # store User_name in seperate variable - used to retrieve UserID
-    User_name = User_info[-1][-3]
-    
-    # create list containing all variables except Cash (Cash stored in portfolio table)
-    temp = []
-    for x in User_info[0][:-1]:
-          temp.append(x)
-    
-    now = datetime.now()
-    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
-    
-    temp.append(dt_string)
-    ## format list data for db uplaod 
-    user_record =[(temp)]
-    
-    # Query 1 Create user record in User table. Query 2 create record in Portfolio table (intial Cash Value) with FK UserID
     user_load = "INSERT INTO User (first_name, last_name, DOB, email, phone, user_name, password, date_time) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)"  
-    
-    # execute Query1 - create user record using user info list
     for x, user in enumerate(user_record):
         mycursor.execute(user_load, user)  
     db.commit()
    
     # retrieve UserID value (auto increment Int) from User record 
-    mycursor.execute("SELECT UserID FROM User WHERE user_name = '{}'".format(User_name))
+    mycursor.execute("SELECT UserID FROM User WHERE user_name = '{}'".format(user_name))
     for x in mycursor:
         UserID = x[0]   
     
-    # store UserID and Cash variables in list 
-    Equity = 0
+    
+    Cash = 200000.00
+    Equity = 0.00
     Balance = Equity + Cash
+    Profit = 0.00
     Return = ((Balance / Cash)-1)*100
     
+    now = datetime.now()
+    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
     
-    new_record = [UserID, dt_string, Equity, Cash, Balance, Return]
-    Cash_load = "INSERT INTO User_Balance (UserID, date_time, Equity, Cash, Balance, percent_return) VALUES (%s,%s,%s,%s,%s,%s)"
     
-    # create portfolio record in database with UserID FK and initial Cash variable from new_record list
-    mycursor.execute(Cash_load, new_record)
+    new_balance = [UserID, Cash, Equity, Balance, Profit, Return, dt_string]
+    Balance_load = "INSERT INTO Balance (UserID, cash, equity, balance, profit_loss, percent_return, date_time) VALUES (%s,%s,%s,%s,%s,%s,%s)"
+    mycursor.execute(Balance_load, new_balance)
     db.commit()    
     
-    # Return UserID to main
+    
     return UserID
     
-## allow existing user to login (return UserID to main)
+# allow existing user to login (return UserID to main)
 def login():
     
     Valid = True
@@ -257,8 +195,8 @@ def API_call(Stonk):
     
 
 
-## retreive purchase info from User input 
-def purchaseinfo(UserID):                            
+# retreive purchase info from User input 
+def purchase_info(UserID):                            
     mycursor.execute("SELECT cash FROM User_Balance WHERE userID = {}".format(UserID))
     for x in mycursor:
         Cash = float(x[0])
@@ -308,7 +246,7 @@ def purchaseinfo(UserID):
                             New_Cash = float(Cash - invest)
                               
                             
-                            Equity_String = "\nYou purchased {} share(s) of {} Congratulations!".format(Shares,Stonk)
+                            Equity_String = "\nCongratulations! \nYou purchased {} share(s) of {}.".format(Shares,Stonk)
                             Cash_String = "you have ${:0.2f} left to invest\n".format(New_Cash)
                             print(Equity_String, Cash_String)
                             
@@ -317,17 +255,15 @@ def purchaseinfo(UserID):
                             dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
                             
                             Purchase_Data = [(UserID,
-                                          dt_string,
-                                          Stonk,
-                                          Shares, 
-                                          Market, 
-                                          Market, 
-                                          invest
-                                          )]
+                                              Stonk,
+                                              Shares, 
+                                              Market,  
+                                              invest,
+                                              dt_string)]
                             
-                            Balance_Data = [(UserID, dt_string, invest, New_Cash)]
+                            Balance_Data = [UserID, New_Cash, invest, dt_string]
                             
-                            
+                
                             return Purchase_Data, Balance_Data
                           
                         else:
@@ -346,47 +282,103 @@ def purchaseinfo(UserID):
                 break
             continue
         
-## create purchase record in Portfolio database 
-def purchaseload(UserID):
-    Data = purchaseinfo(UserID)
+# create purchase record in Portfolio database 
+def purchase_load(UserID):
+    Data = purchase_info(UserID)
     
     if Data == 'false':
         print("\nNo purchase was made\n")
     
     else:        
         Purchase_Data = Data[0]
-        Balance_Data = Data[1][0]
+        Order_load = "INSERT INTO Orders (UserID, stock, shares, cost, total_investment, date_time) VALUES (%s, %s, %s, %s, %s, %s)"   
+        for x, data in enumerate(Purchase_Data):
+            mycursor.execute(Order_load, data)
+        db.commit
         
         
-        Port_info = port_info(UserID)
-            
-        Old_Equity = Port_info[0][0][2]
-        datetime = Port_info[0][0][1]
-        Return = Port_info[0][0][5]
+        # Balance_Data = [UserID, New_Cash, invest, dt_string]
+        Balance_Data = Data[1]
+        Cash = Balance_Data[1]
+        invest = Balance_Data[2]
+        date = Balance_Data[3]
         
-        New_Equity = Balance_Data[2] 
-        New_Cash = Balance_Data[3]
         
-        Total_Equity = Old_Equity + New_Equity
-        Cash = New_Cash
-        Balance = Total_Equity + Cash
+        Old_Equity = 0.00
+        Balance = Equity + Cash
+        Profit = 0.00
+        Return = ((Balance / Cash)-1)*100
         
-        new_record = [(UserID, datetime, Total_Equity, Cash, Balance, Return)]
-                
-        b_load = "INSERT INTO User_Balance (UserID, date_time, Equity, Cash, Balance, percent_return) VALUES (%s, %s, %s, %s, %s, %s)"   
-        for x, data in enumerate(new_record):
-            mycursor.execute(b_load, data)
+        
+        new_balance = [UserID, Cash, Equity, Balance, Profit, Return, dt_string]
+        Balance_load = "INSERT INTO Balance (UserID, cash, equity, balance, profit_loss, percent_return, date_time) VALUES (%s,%s,%s,%s,%s,%s,%s)"
+        mycursor.execute(Balance_load, new_balance)
+        db.commit()
+
+    
+def portfolio_update(UserID):
+    
+    stonklist = []
+    mycursor.execute("SELECT stock FROM Orders WHERE userID = {}".format(UserID))
+    for x in mycursor:
+        stonklist.append(x[-1])
+    stonklist = list(dict.fromkeys(stonklist))
+
+    current_stocks = []
+    mycursor.execute("SELECT stock FROM Portfolio WHERE userID = {}".format(UserID))
+    for x in mycursor:
+        current_stocks.append(x[-1])
+    current_stocks = list(dict.fromkeys(stonklist))
+
+
+    portfolio = []
+    for x in stonklist:
+        Stonk = x
+        
+        value = API_call(Stonk)
+        value['4. close']
+        Market = float(value['4. close'][0])
+        
+        
+        sharelist = []
+        mycursor.execute("SELECT shares FROM Orders WHERE userID = {} AND stock = '{}'".format(UserID, Stonk))
+        for x in mycursor:
+            sharelist.append(x[-1])
+        
+        total_shares = float(sum(sharelist))
+        if total_shares == 0:
+            continue
+        
+        Equity = float(total_shares * Market)
+        
+        
+        cost_list = []
+        mycursor.execute("SELECT total_investment FROM Orders WHERE userID = {} AND stock = '{}'".format(UserID, Stonk))
+        for x in mycursor:
+            cost_list.append(x[-1])
+        
+        Cost = float(sum(cost_list))
+        avg_cost = (Cost / total_shares)
+        
+        
+        profit = float(Equity - Cost)
+        percent = ((Equity / Cost)-1) * 100
+        
+        now = datetime.now()
+        dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
+        
+        new_record = [UserID, Stonk, total_shares, Equity, avg_cost, Market, profit, percent, dt_string]
+        
+        
+        
+        Portfolio_load = "INSERT INTO Portfolio (UserID, stock, share, equity, avg_cost, mkt_price, profit_loss, percent_return, date_time) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+        mycursor.execute(Portfolio_load, new_record)
         db.commit()
         
+    
+    
         
-        Port_load = "INSERT INTO Portfolio (UserID, date_time, stonks, shares, cost, mkt_price, total_val) VALUES (%s, %s, %s, %s, %s, %s, %s)"   
-        for x, data in enumerate(Purchase_Data):
-            mycursor.execute(Port_load, data)
-        db.commit
-
-        
-        
-## retreive sell info from User input
+# retreive sell info from User input
 def sellinfo(UserID):   
     Sell = True
     while Sell == True: 
@@ -472,7 +464,7 @@ def sellinfo(UserID):
                     Sell_Data = "false"
                     return Sell_Data
                
-## create sell record in Portfolio database
+# create sell record in Portfolio database
 def sell_load(UserID):
     Data = sellinfo(UserID)
     
@@ -516,24 +508,29 @@ def sell_load(UserID):
         # PREVENETS UNNECESSARY DELAYS IN PORTFOLIO VIEW TIME.
         ######################################################################
         
-        # Stonk = Purchase_Data[-1][2]
-        # sharelist = []
-        # #select all shares assosciated with a given stonk 
-        # mycursor.execute("SELECT shares FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, Stonk))
-        # for x in mycursor:
-        #     #append shares in table to share list 
-        #     sharelist.append(x[-1])
+        Stonk = Purchase_Data[-1][2]
+        sharelist = []
+        #select all shares assosciated with a given stonk 
+        mycursor.execute("SELECT shares FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, Stonk))
+        for x in mycursor:
+            #append shares in table to share list 
+            sharelist.append(x[-1])
         
-        # #total all shares associated with a given stonk from each purchase order / sell order portfolio row
-        # total_shares = float(sum(sharelist))
+        #total all shares associated with a given stonk from each purchase order / sell order portfolio row
+        total_shares = float(sum(sharelist))
         
-        # if total_shares == 0:
-        #     mycursor.execute("DELETE FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, Stonk))
-        # db.commit 
+        if total_shares == 0:
+            mycursor.execute("DELETE FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, Stonk))
+        db.commit 
                 
         
+
+
         
-## View user portfolio data 
+        
+        
+        
+
 def port_info(UserID):
     
     #pull the last cash value stored in the Balance table
@@ -635,7 +632,6 @@ def port_info(UserID):
     
     return load_list, b_list, tablist, graph
     
-## load portfolio / balance data into database
 def port_load(UserID): 
     
     data = port_info(UserID)
@@ -654,7 +650,6 @@ def port_load(UserID):
     
     return load_list, b_list, tablist, graph
 
-## display portfolio / balance data
 def port_display(UserID):
     print("\nloading...\n")
     
@@ -670,7 +665,6 @@ def port_display(UserID):
         table = tabulate(tablist, headers=['Stock', 'Shares', 'Average Cost', "Total Cost", 'Equity', 'Profit', '% return'], tablefmt='orgtbl')
         print(table)
 
-    # graph = graph[0::1]
     df = DataFrame (graph,columns=['Date','Balance'])
     df['Balance'] = df['Balance'].astype(float)
     df.plot(x = 'Date', y = 'Balance')
@@ -775,6 +769,70 @@ def rank_display():
     table = tabulate(rank_list, headers=["User", "Balance", "% Return", "Rank"], tablefmt='orgtbl')
     print(table,"\n")
     
+
+
+def awards_menu(UserID):
+     while True:
+        action = input("1. view awards \n2. suggest an award \n3. exit\n(select an option): ")
+            
+        if action == '1':
+            print_awards()
+            
+            continue
+        
+        if action == '2':
+            suggest_award(UserID)
+            
+            continue
+    
+        if action == '3':
+           
+            print("\n")
+            break
+        break
+    
+def print_awards():
+    
+    award_list = [("BULL GOD:","The Bull God is the God of returns. This trader has the most successful portfolio, the most chicken tendies, and the biggest pp (bull sized)."),
+                  ("AUTISMO 9000:","Autismo 9000 is a retard; his portfolio is the worst performing on the platform (little to no tendies)."),
+                  ("DADDY ELON:","This trader loves to buy tesla stock. ‘pwease daddy Ewon, can I hav sum mor gainz uwu.’"),
+                  ("LONG TERM POSITION KING:","Any trader who owns Drive Shack equity"),
+                  ("CAPITALIST CHAD:","The trader with the most AMZN stock."),
+                  ("COMMIE TRAITOR:","Any trader who owns Alibaba - NYSE(BABA)."),
+                  ("STEPHEN TOMZAC:","If a trader earns $17.3k in profit they shall receive the Stephen Tomzac award (whoever wins this award is obviously Stephen Tomzac)."),
+                  ("420 WEED SMOKER:","Any trader who owns CGC, CRON, GWPH, or MJ."),
+                  ("SILICON TIDDIES:","Trader with most combined stock in FB, GOOGL, or AAPL."),
+                  ("AFFIRMATIVE ACTION:","The trader with the most diverse portfolio."), 
+                  ("SEND IT:","A trader who owns equity in just one company.")]
+    
+    coming_awards = [("SHKRELI BRO:","To earn this award, you must be a true pharma bro by owning the most combined equity in pharmaceuticals.")]
+    
+    print(colored("AWARDS:\n",attrs=['underline']))
+    for x in award_list:
+        print(colored(x[0],'cyan'))
+        print(x[1],"\n")
+        
+    print(colored("COMING AWARDS:\n",attrs=['underline']))
+    for x in coming_awards:
+        print(colored(x[0],'cyan'))
+        print(x[1],"\n")
+
+def suggest_award(UserID):
+
+    award_name = input("Award Name: ")
+    desc = input("Award Description: ")
+    
+    now = datetime.now()
+    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
+    
+    suggestion = [UserID, dt_string, award_name, desc]
+    
+    Q = "INSERT INTO suggestions (UserID, date_time, award, description) VALUES (%s,%s,%s,%s)"
+    mycursor.execute(Q, suggestion)
+    db.commit()
+        
+    print("\nThanks for the suggestion!\n")
+
 
 
 def update_user(UserID):
@@ -957,6 +1015,10 @@ def check_DOB(DOB):
    return True
       
  
+    
+
+
+
 def test():
     DOB = ("07/27/1995")
     DOB = datetime.strptime(DOB, "%m/%d/%Y")
@@ -964,13 +1026,12 @@ def test():
     
     
     
-# update_phone()
+# suggest_award()
 # test()
 
 # userload()
 # portload()
 # printtables()
-# test()
 # login()
 # trunkport()
 # trunkuser()
