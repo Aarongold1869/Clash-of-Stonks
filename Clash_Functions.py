@@ -8,15 +8,11 @@ Created on Fri Jul 3 17:11:09 2020
 ## pulls stonk data from Alpha Vantage API
 import requests
 import alpha_vantage
-## Alpha_Vantage API Key
 API_KEY = 'GFUV3575DL68NYGL'
     
 ## command imports data from AV API and uses Python Pandas to format data
 from alpha_vantage.timeseries import TimeSeries
 ts = TimeSeries(API_KEY, output_format = 'pandas')
-
-## allows operation on JSON objects and files
-import json
 
 ## allows for creation of graphs and charts based on stonk data
 import matplotlib.pyplot as plt
@@ -35,8 +31,6 @@ from pandas import DataFrame
 
 import re
 
-from termcolor import colored
-
 ## conects to MySQL Database
 import mysql.connector
 db = mysql.connector.connect(
@@ -50,11 +44,28 @@ mycursor = db.cursor(buffered=True)
 
 ##############################################################################
 ##############################################################################
+
+def date_time():
     
+    Now = datetime.now()
+    Date_Time = Now.strftime("%Y/%m/%d %H:%M:%S")
+    
+    return Date_Time
+
+def API_call(Stonk):
+
+    while True:
+        
+        try:
+            values_1, columns = ts.get_intraday(symbol = Stonk)
+            return values_1
+        
+        except ValueError:
+            continue
+    
+
 # retrieve user input for creating user account
 def user_info():    
-    ## Set initial Cash Balance
-    Cash = 200000.00
 
     first_name = input("What is your first name?: ")
     last_name = input("What is your last name?: ")
@@ -96,70 +107,48 @@ def user_info():
          break
     
     password = input("Create a password: ")
+    Date_Time = date_time()
+    Cash = 200000.00
     
-    now = datetime.now()
-    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
-    
-    # store user account info in list to be uploaded to mysql database
-    User_info = [(first_name,
+    User_Info = [(first_name,
                   last_name,
                   DOB,
                   email,
                   phone,
                   user_name,
                   password,
-                  dt_string)]
+                  Date_Time,
+                  Cash)]
+    
+    user_load(User_Info)
     
     # welcome message
     Introduction = "\nHey {}! You have ${:0.2f} to invest. Let's get started!".format(user_name, Cash)
     print(Introduction)
     
-    return User_info
-
-# create user record in User table
-def user_load():
-
-    user_record = user_info()
-    user_name = user_info[-1][-2]
-    
-    user_load = "INSERT INTO User (first_name, last_name, DOB, email, phone, user_name, password, date_time) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)"  
-    for x, user in enumerate(user_record):
-        mycursor.execute(user_load, user)  
-    db.commit()
-   
-    # retrieve UserID value (auto increment Int) from User record 
     mycursor.execute("SELECT UserID FROM User WHERE user_name = '{}'".format(user_name))
     for x in mycursor:
-        UserID = x[0]   
-    
-    
-    Cash = 200000.00
-    Equity = 0.00
-    Balance = Equity + Cash
-    Profit = 0.00
-    Return = ((Balance / Cash)-1)*100
-    
-    now = datetime.now()
-    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
-    
-    
-    new_balance = [UserID, Cash, Equity, Balance, Profit, Return, dt_string]
-    Balance_load = "INSERT INTO Balance (UserID, cash, equity, balance, profit_loss, percent_return, date_time) VALUES (%s,%s,%s,%s,%s,%s,%s)"
-    mycursor.execute(Balance_load, new_balance)
-    db.commit()    
-    
+        UserID = x[0]
     
     return UserID
     
+# create user record in User table
+def user_load(User_Info):
+
+    User_Load = "INSERT INTO User (first_name, last_name, DOB, email, phone, user_name, pass_word, date_time, cash) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)"  
+    for x, user in enumerate(User_Info):
+        mycursor.execute(User_Load, user)  
+    db.commit()
+
 # allow existing user to login (return UserID to main)
 def login():
     
     Valid = True
     while Valid == True:
-        User_name = input("Username: ")
+        user_name = input("Username: ")
         password = input("Password: ")
         
-        mycursor.execute("SELECT UserID FROM User WHERE user_name = '{}' AND password = '{}'".format(User_name,password))
+        mycursor.execute("SELECT UserID FROM User WHERE user_name = '{}' AND pass_word = '{}'".format(user_name,password))
         for x in mycursor:
             UserID = x[0]
     
@@ -178,595 +167,404 @@ def login():
                 return UserID
         
         else:
-            print("\nHey, {}!".format(User_name))
+            print("\nHey, {}!".format(user_name))
             return UserID
-            
-    
-def API_call(Stonk):
-
-    while True:
-        
-        try:
-            values_1, columns = ts.get_intraday(symbol = Stonk)
-            return values_1
-        
-        except ValueError:
-            continue
-    
 
 
 # retreive purchase info from User input 
-def purchase_info(UserID):                            
-    mycursor.execute("SELECT cash FROM User_Balance WHERE userID = {}".format(UserID))
+def purchase_order(UserID):                            
+    
+    mycursor.execute("SELECT cash FROM User WHERE UserID = {}".format(UserID))
     for x in mycursor:
         Cash = float(x[0])
+    Cash_string = "You have ${:0.2f}".format(Cash)
+    print(Cash_string)
     
-    invest = True
-    while invest == True:  
+    Trade = True
+    while Trade == True:  
         ## retreive user input, retreive stonk data, display stonk data
-        Stonk = input("Insert a stock ticker or type '%' to cancel: ")
+        Stock = input("Insert a stock ticker or type '%' to cancel: ")
         
-        if Stonk == '%':
-            invest = False
-            Purchase_Data = "false"
-            return Purchase_Data
+        if Stock == '%':
+            Trade = False
+            Order = "false"
+            return Order
         
         else:
-            values_1 = API_call(Stonk)
-            values_1['4. close'].plot()
+            Data = API_call(Stock)
+            Data['4. close'].plot()
             plt.show()
-            print(values_1)
-        
-        ## retrieves last market value of stock from array and converts to integer
-            Market = float(values_1['4. close'][0])
+            print(Data)
+            Price = float(Data['4. close'][0])
             
-            ## displays stock price of user requested sotck and asks for user input
-            Mkt_String = "{} is trading at ${:0.2f}. Would you like to buy equity in {}?".format(Stonk, Market, Stonk)
+            Mkt_String = "{} is trading at ${:0.2f}. Would you like to purchase equity in {}?".format(Stock, Price, Stock)
             print(Mkt_String)
             Action = input('1. Yes\n2. No\n')
             
             Buy = True
             while Buy == True:
-                ## user input - if user does not want to purchase stock, break while loop    
-               
-                ##if user would like to purchase stock, display remaining money, get input on how many shares to purchase
+
                 if Action =='1':   
-                    Cash_string = "You have ${:0.2f}".format(Cash)
-                    print(Cash_string)
             
                     Shares = int(input("How many shares would you like to buy? Enter # of shares:\npress '0' to cancel\n"))
                     
                     if Shares != 0:
-                        invest = float(Shares * Market)
-                   
-                    ##if user can afford number of shares requeste
                         
-                        if (Cash - invest) > 0:
-                            ##subtract shares purchased from cash
-                            New_Cash = float(Cash - invest)
-                              
+                        Investment = float(Shares * Price)
+                                           
+                        if (Cash - Investment) > 0:
                             
-                            Equity_String = "\nCongratulations! \nYou purchased {} share(s) of {}.".format(Shares,Stonk)
-                            Cash_String = "you have ${:0.2f} left to invest\n".format(New_Cash)
+                            Cash = float(Cash - Investment)
+                            
+                            Equity_String = "\nCongratulations! \nYou purchased {} share(s) of {}.".format(Shares,Stock)
+                            Cash_String = "you have ${:0.2f} left to invest\n".format(Cash)
                             print(Equity_String, Cash_String)
                             
+                            Date_Time = date_time()
+
+                            Order = [UserID, Stock, Shares, Price, Date_Time]
                             
-                            now = datetime.now()
-                            dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
+                            submit_order(Order)
+                            update_cash(Cash, UserID)
+                            update_portfolio(UserID)
+                            load_stock(Stock, Price)
+                            update_equity(UserID)
                             
-                            Purchase_Data = [(UserID,
-                                              Stonk,
-                                              Shares, 
-                                              Market,  
-                                              invest,
-                                              dt_string)]
-                            
-                            Balance_Data = [UserID, New_Cash, invest, dt_string]
-                            
-                
-                            return Purchase_Data, Balance_Data
+                            return Order
                           
                         else:
-                            ##alert user of insufficient funds
+                            
                             print('\nYou dont have enough money.')
-                            ## start loop over 
+                            
                             continue
-                        continue
                         
                     else:
+                        Buy = False
                         break
                     
-                    
                 elif Action == '2':
-                   break
-                break
-            continue
+                  
+                    continue
         
-# create purchase record in Portfolio database 
-def purchase_load(UserID):
-    Data = purchase_info(UserID)
+def sale_order(UserID):   
     
-    if Data == 'false':
-        print("\nNo purchase was made\n")
-    
-    else:        
-        Purchase_Data = Data[0]
-        Order_load = "INSERT INTO Orders (UserID, stock, shares, cost, total_investment, date_time) VALUES (%s, %s, %s, %s, %s, %s)"   
-        for x, data in enumerate(Purchase_Data):
-            mycursor.execute(Order_load, data)
-        db.commit
-        
-        
-        # Balance_Data = [UserID, New_Cash, invest, dt_string]
-        Balance_Data = Data[1]
-        Cash = Balance_Data[1]
-        invest = Balance_Data[2]
-        date = Balance_Data[3]
-        
-        
-        Old_Equity = 0.00
-        Balance = Equity + Cash
-        Profit = 0.00
-        Return = ((Balance / Cash)-1)*100
-        
-        
-        new_balance = [UserID, Cash, Equity, Balance, Profit, Return, dt_string]
-        Balance_load = "INSERT INTO Balance (UserID, cash, equity, balance, profit_loss, percent_return, date_time) VALUES (%s,%s,%s,%s,%s,%s,%s)"
-        mycursor.execute(Balance_load, new_balance)
-        db.commit()
-
-    
-def portfolio_update(UserID):
-    
-    stonklist = []
-    mycursor.execute("SELECT stock FROM Orders WHERE userID = {}".format(UserID))
+    mycursor.execute("SELECT cash FROM User WHERE UserID = {}".format(UserID))
     for x in mycursor:
-        stonklist.append(x[-1])
-    stonklist = list(dict.fromkeys(stonklist))
-
-    current_stocks = []
-    mycursor.execute("SELECT stock FROM Portfolio WHERE userID = {}".format(UserID))
-    for x in mycursor:
-        current_stocks.append(x[-1])
-    current_stocks = list(dict.fromkeys(stonklist))
-
-
-    portfolio = []
-    for x in stonklist:
-        Stonk = x
-        
-        value = API_call(Stonk)
-        value['4. close']
-        Market = float(value['4. close'][0])
-        
-        
-        sharelist = []
-        mycursor.execute("SELECT shares FROM Orders WHERE userID = {} AND stock = '{}'".format(UserID, Stonk))
-        for x in mycursor:
-            sharelist.append(x[-1])
-        
-        total_shares = float(sum(sharelist))
-        if total_shares == 0:
-            continue
-        
-        Equity = float(total_shares * Market)
-        
-        
-        cost_list = []
-        mycursor.execute("SELECT total_investment FROM Orders WHERE userID = {} AND stock = '{}'".format(UserID, Stonk))
-        for x in mycursor:
-            cost_list.append(x[-1])
-        
-        Cost = float(sum(cost_list))
-        avg_cost = (Cost / total_shares)
-        
-        
-        profit = float(Equity - Cost)
-        percent = ((Equity / Cost)-1) * 100
-        
-        now = datetime.now()
-        dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
-        
-        new_record = [UserID, Stonk, total_shares, Equity, avg_cost, Market, profit, percent, dt_string]
-        
-        
-        
-        Portfolio_load = "INSERT INTO Portfolio (UserID, stock, share, equity, avg_cost, mkt_price, profit_loss, percent_return, date_time) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-        mycursor.execute(Portfolio_load, new_record)
-        db.commit()
-        
+        Cash = float(x[0])
     
-    
+    Trade = True
+    while Trade == True: 
         
-# retreive sell info from User input
-def sellinfo(UserID):   
-    Sell = True
-    while Sell == True: 
+        Stock = input("Which stock would you like to sell?\n(Insert stock ticker. Press '%' to cancel.):")
         
-        stonk_sell = input("Which stock would you like to sell?\n(Insert stock ticker. Press '%' to cancel.):")
-        
-        if stonk_sell == '%':
-            Sell = False
-            Sell_Data = "false"
-            return Sell_Data
+        if Stock == '%':
+            
+            Trade = False
+            Order = "false"
+            return Order
         
         else:
-            mycursor.execute("SELECT cash FROM User_Balance WHERE userID = {}".format(UserID))
-            for x in mycursor:
-                #assign most recent cash value to variable 'Cash'
-                Cash = float(x[-1])
             
-            value = API_call(stonk_sell)
-            value['4. close']
-            Market_sell = float(value['4. close'][0])
+            Data = API_call(Stock)
+            Data['4. close']
+            Price = float(Data['4. close'][0])
             
-            sharelist = []
-            #select all shares assosciated with a given stonk 
-            mycursor.execute("SELECT shares FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, stonk_sell))
-            for x in mycursor:
-                #append shares in table to share list 
-                sharelist.append(x[-1])
+            Total_Shares = sum_col('shares', 'Portfolio', 'stock', Stock, UserID)
             
-            #total all shares associated with a given stonk from each purchase order / sell order portfolio row
-            total_shares = float(sum(sharelist))
-            #Total Equity (current) = number of shares times current market value 
-            
-            cost_list = []
-            mycursor.execute("SELECT total_val FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, stonk_sell))
-            for x in mycursor:
-                #append purchase costs to list 
-                cost_list.append(x[-1])
-            
-            #sum all purchase costs to get total investment for a given stock - assign to variable "Cost"
-            Cost = float(sum(cost_list))
-            #avg cost for a given stonk is Total investment Cost / Total shares 
-            avg_cost = float(Cost / total_shares)
-            
-            Sell_Clause = True
-            while Sell_Clause == True:
+            Sell = True
+            while Sell == True:
                
-                shares_sell = int(input("{} is trading at ${}. How many shares would you like to sell?\n(Type '0' to cancel.)".format(stonk_sell, Market_sell)))
+                Shares = int(input("{} is trading at ${}. How many shares would you like to sell?\n(Type '0' to cancel.)".format(Stock, Price)))
                 
-                if shares_sell != 0: 
-                    debit = float(shares_sell * Market_sell)
-                    Cash = Cash + debit
-                    inv = total_shares - shares_sell
+                if Shares != 0: 
+                    Debit = float(Shares * Price)
+                    Cash = float(Cash + Debit)
+                    Inventory = Total_Shares - Shares
                     
-                    if inv >= 0:
-                        print("\nCongrats! You sold {} shares of {} for a debit to your account of ${:0.2f}.\n".format(shares_sell, stonk_sell, debit))
+                    if Inventory >= 0:
+                        print("\nCongrats! You sold {} shares of {} for a debit to your account of ${:0.2f}.\n".format(Shares, Stock, Debit))
                     
-                        shares_sell = (shares_sell * (-1))
-                        debit = (debit * (-1))
+                        Shares = (Shares * (-1))
+                        Date_Time = date_time()
                         
-                        now = datetime.now()
-                        dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
+                        Order = [UserID, Stock, Shares, Price, Date_Time]
+                            
+                        submit_order(Order)
+                        update_cash(Cash, UserID)
+                        update_portfolio(UserID)
+                        load_stock(Stock, Price)
+                        update_equity(UserID)
+              
+                        return Order
                         
-                        Sell_Data = [(UserID,
-                                      dt_string,
-                                      stonk_sell,
-                                      shares_sell, 
-                                      avg_cost, 
-                                      Market_sell, 
-                                      debit
-                                      )]
-                        
-                        Balance_Data = [(UserID, dt_string, debit, Cash)]
-                        
-                        return Sell_Data, Balance_Data
-                
                     else:
-                        print("\nYou cannot sell that many shares, you only own {} shares of {}.".format(total_shares, stonk_sell))
+                        print("\nYou cannot sell that many shares, you own {} shares of {}.".format(Total_Shares, Stock))
                         continue
                     break 
                 
                 else:
                     Sell = False
-                    Sell_Data = "false"
-                    return Sell_Data
-               
-# create sell record in Portfolio database
-def sell_load(UserID):
-    Data = sellinfo(UserID)
+                    Order = "false"
+                    return Order
+        
+        
+def submit_order(Order):
+      
+    Order_load = "INSERT INTO Orders (UserID, stock, shares, cost_per, date_time) VALUES (%s,%s,%s,%s,%s)"
+    mycursor.execute(Order_load, Order)
+    db.commit()
+
+def update_portfolio(UserID):
     
-    if Data == 'false':
-        print("\nNo sale was made\n")
+    Date_Time = date_time()
+    
+    Stock_List = []
+    mycursor.execute("SELECT stock FROM Orders WHERE UserID = {}".format(UserID))
+    for x in mycursor:
+        Stock_List.append(x[0])
+    Stock_List = list(dict.fromkeys(Stock_List))
+    
+    for Stock in Stock_List:
+        Shares = sum_col('shares', 'Orders', 'stock', Stock, UserID)
+        Total_Cost = sum_col("investment", 'Orders', 'stock', Stock, UserID)
+
+        mycursor.execute("SELECT * FROM Portfolio WHERE Stock = '{}' AND UserID = {}".format(Stock, UserID))
+        row_count = mycursor.rowcount
         
-    else:
-        Purchase_Data = Data[0]
-        Balance_Data = Data[1][0]
-       
+        if row_count == 0:
+            Stock_Info = [UserID, Stock, Shares, Total_Cost, Date_Time]
+            Q1 = ("INSERT INTO Portfolio (UserID, stock, shares, total_cost, date_time) VALUES(%s,%s,%s,%s,%s)")
+            mycursor.execute(Q1, Stock_Info)
+            db.commit()
         
-        Port_info = port_info(UserID)
-            
-        Old_Equity = Port_info[0][0][2]
-        datetime = Port_info[0][0][1]
-        Return = Port_info[0][0][5]
+        else:
+            mycursor.execute("UPDATE Portfolio SET shares = {}, total_cost = {}, date_time = '{}' WHERE stock = '{}' AND UserID = {}".format(Shares, Total_Cost, Date_Time, Stock, UserID))
+            db.commit()
+
+        remove_stock(Stock)
+    
+def update_cash(Cash, UserID):
+    
+    mycursor.execute("UPDATE USER SET cash = {} WHERE UserID = {}".format(Cash, UserID))    
+    db.commit()
         
-        New_Equity = Balance_Data[2] 
-        New_Cash = Balance_Data[3]
+
+def sum_col(Select, Table, Column, Value, UserID):
         
-        Total_Equity = Old_Equity + New_Equity
-        Cash = New_Cash
-        Balance = Total_Equity + Cash
+    mycursor.execute("SELECT SUM({}) FROM {} WHERE {} = '{}' AND UserID = {}".format(Select, Table, Column, Value, UserID))
+    for x in mycursor:
+        sum_col = x[0]
+    
+    return sum_col
+
+def share_count(Stock):
         
-        new_record = [(UserID, datetime, Total_Equity, Cash, Balance, Return)]
-                
-        b_load = "INSERT INTO User_Balance (UserID, date_time, Equity, Cash, Balance, percent_return) VALUES (%s, %s, %s, %s, %s, %s)"   
-        for x, data in enumerate(new_record):
-            mycursor.execute(b_load, data)
+    mycursor.execute("SELECT SUM(shares) FROM Orders WHERE Stock = '{}'".format(Stock))
+    for x in mycursor:
+        Total_Shares = x[0]
+    
+    return Total_Shares
+
+def user_share_count(Stock, UserID):
+    
+    mycursor.execute("SELECT SUM(shares) FROM Orders WHERE Stock = '{}' AND UserID = {}".format(Stock, UserID))
+    for x in mycursor:
+        Total_Shares = x[0]
+    
+    return Total_Shares
+    
+def remove_stock(Stock):
+    
+    mycursor.execute("SELECT SUM(shares) FROM Portfolio WHERE Stock = '{}'".format(Stock))
+    for x in mycursor:
+        Total_Shares = x
+    
+    if Total_Shares == 0:
+        mycursor.execute("SET SQL_SAFE_UPDATES = 0")
+        mycursor.execute("DELETE FROM Portfolio WHERE stock = '{}'".format(Stock))
+        mycursor.execute("SET SQL_SAFE_UPDATES = 1")
         db.commit()
-        
-        
-        Port_load = "INSERT INTO Portfolio (UserID, date_time, stonks, shares, cost, mkt_price, total_val) VALUES (%s, %s, %s, %s, %s, %s, %s)"   
-        for x, data in enumerate(Purchase_Data):
-            mycursor.execute(Port_load, data)
-        db.commit
+
+
+def load_stock(Stock, Price):
     
-        #######################################################################
-        # if all shares of stock sold -- delete stock from Portfolio Table : 
-        # THIS FUNCTIONALITY ONLY NECESSARY WHEN API CALL FREQ LIMIT IN EFFECT 
-        # PREVENETS UNNECESSARY DELAYS IN PORTFOLIO VIEW TIME.
-        ######################################################################
-        
-        Stonk = Purchase_Data[-1][2]
-        sharelist = []
-        #select all shares assosciated with a given stonk 
-        mycursor.execute("SELECT shares FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, Stonk))
-        for x in mycursor:
-            #append shares in table to share list 
-            sharelist.append(x[-1])
-        
-        #total all shares associated with a given stonk from each purchase order / sell order portfolio row
-        total_shares = float(sum(sharelist))
-        
-        if total_shares == 0:
-            mycursor.execute("DELETE FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, Stonk))
-        db.commit 
-                
-        
+    Date_Time = date_time()
 
-
-        
-        
-        
-        
-
-def port_info(UserID):
+    mycursor.execute("SELECT * FROM Stocks WHERE Stock = '{}'".format(Stock))
+    row_count = mycursor.rowcount
+   
+    if row_count == 0:  
+        Stock_Info = [Stock, Price, Date_Time]
+        Q1 = ("INSERT INTO Stocks (stock, price, date_time) VALUES(%s,%s,%s)")
+        mycursor.execute(Q1, Stock_Info)
+        db.commit()
     
-    #pull the last cash value stored in the Balance table
-    mycursor.execute("SELECT cash FROM User_Balance WHERE userID = {}".format(UserID))
+    else:
+        mycursor.execute("UPDATE Stocks SET price = {}, date_time = '{}' WHERE stock = '{}'".format(Price, Date_Time, Stock))
+        db.commit()
+    
+def update_stocks():
+    
+    Date_Time = date_time()
+    
+    Stock_List = []
+    mycursor.execute("SELECT stock FROM Portfolio")
     for x in mycursor:
-        #assign most recent cash value to variable 'Cash'
-        Cash = float(x[-1])
+        Stock_List.append(x[0])
+    Stock_List = list(dict.fromkeys(Stock_List))
     
-    
-    #create a list for storing the names of stonks owned in a portfolio
-    stonklist = []
-    #select all stonks from user portfolio 
-    mycursor.execute("SELECT stonks FROM Portfolio WHERE userID = {}".format(UserID))
-    for x in mycursor:
-        #write stonks in portfolio table into a list 
-        stonklist.append(x[-1])
-    #sort list into dicitionary to remove duplicate values
-    stonklist = list(dict.fromkeys(stonklist))
-    #(excluding the first value which is null due to intial table creation)  
-
+    for Stock in Stock_List:
+        Total_Shares = share_count(Stock)
         
-    #create list for storing values to be displayed in tablulate table
-    tablist = []
-    #create list for storing Equity values in a given row for a given stonk
-    equity_list = []
-    #for each stock in the stonklist 
-    
-    for x in stonklist:
-        Stonk = x
-        #retrieve market value from AV API for stonk in stonklist
-        value = API_call(Stonk)
-        value['4. close']
-        #assign most recent stock value to variable 'Market' to be used in calculations 
-        Market = float(value['4. close'][0])
-        
-        #create list for storing number of shares per stonk
-        sharelist = []
-        #select all shares assosciated with a given stonk 
-        mycursor.execute("SELECT shares FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, Stonk))
-        for x in mycursor:
-            #append shares in table to share list 
-            sharelist.append(x[-1])
-        
-        #total all shares associated with a given stonk from each purchase order / sell order portfolio row
-        total_shares = float(sum(sharelist))
-        if total_shares == 0:
+        if Total_Shares == 0:
             continue
         
-        #Total Equity (current) = number of shares times current market value 
-        Equity = float(total_shares * Market)
+        Data = API_call(Stock)
+        Market = float(Data['4. close'][0])
+
+        mycursor.execute("SELECT * FROM Stocks WHERE Stock = '{}'".format(Stock))
+        row_count = mycursor.rowcount
         
-        #create list for storing investment costs by stock by purchase order
-        cost_list = []
-        #pull all investment costs by stock by purchase order from portfolio table
-        mycursor.execute("SELECT total_val FROM Portfolio WHERE userID = {} AND stonks = '{}'".format(UserID, Stonk))
-        for x in mycursor:
-            #append purchase costs to list 
-            cost_list.append(x[-1])
+        if row_count == 0:
+            Stock_Info = [Stock, Market, Date_Time]
+            Q1 = ("INSERT INTO Stocks (stock, price, date_time) VALUES(%s,%s,%s)")
+            mycursor.execute(Q1, Stock_Info)
+            db.commit()
         
-        #sum all purchase costs to get total investment for a given stock - assign to variable "Cost"
-        Cost = float(sum(cost_list))
-        #avg cost for a given stonk is Total investment Cost / Total shares 
-        avg_cost = (Cost / total_shares)
-        #Profit by stock = total Current equity - Total intitial investment cost
-        profit = float(Equity - Cost)
-        #percent return for a given stock = Equity / cost -1 *100
-        percent = ((Equity / Cost)-1) * 100
-        
-        #Store variable values in a string to be formatted in table by tabulate module 
-        l = [Stonk, total_shares, "${:0.2f}".format(avg_cost), "${:0.2f}".format(Cost), "${:0.2f}".format(Equity), "${:0.2f}".format(profit), "{:0.4f}%".format(percent)]
-        tablist.append(l) 
-        
-        #append Equity value by stonk to list to calculate total current portfolio value 
-        equity_list.append(Equity)
-        # Update mareket price column in Portfolio for all rows for a given stonk 
+        else:
+            mycursor.execute("UPDATE Stocks SET price = {}, date_time = '{}' WHERE stock = '{}'".format(Market, Date_Time, Stock))
+            db.commit()
+  
+def update_equity(UserID):
     
+    Equity = 0
+    Date_Time = date_time() 
     
-    Total_Equity = float(sum(equity_list))
-    Balance = float(Cash + Total_Equity)
-    
-    mycursor.execute("SELECT cash FROM User_Balance WHERE UserID ={} LIMIT 1".format(UserID))
+    mycursor.execute("SELECT cash FROM User WHERE UserID = {}".format(UserID))
     for x in mycursor:
-        Initial = float(x[0])
-   
-    Profit = Balance - Initial
-    Return = ((Balance / Initial)-1)*100
-    now = datetime.now()
-    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
+        Cash = x[0]
     
-    load_list = [(UserID, dt_string, Total_Equity, Cash, Balance, Return)]
-    b_list = [Balance, Profit, Return]
-    
-    
-    graph = []          
-    mycursor.execute("SELECT date_time, Balance FROM User_Balance WHERE userID = {}".format(UserID))
+    mycursor.execute("SELECT (shares * price) FROM Portfolio INNER JOIN Stocks ON Portfolio.stock = Stocks.stock WHERE UserID = {}".format(UserID))
     for x in mycursor:
-        graph.append(x)
-    
-    
-    return load_list, b_list, tablist, graph
-    
-def port_load(UserID): 
-    
-    data = port_info(UserID)
-    
-    load_list = data[0]
-    b_list = data[1]
-    tablist = data[2]
-    graph = data[3]
-             
-    mycursor.execute("set innodb_lock_wait_timeout=1000")
-    b_load = "INSERT INTO User_Balance (UserID, date_time, Equity, Cash, Balance, percent_return) VALUES (%s, %s, %s, %s, %s, %s)"   
-    for x, data in enumerate(load_list):
-        mycursor.execute(b_load, data)
+        Equity = Equity + x[0]
+       
+    Equity_Data = [UserID, Equity, Cash, Date_Time]
+    Q1 = "INSERT INTO Equity (UserID, equity, cash, date_time) VALUES (%s,%s,%s,%s)"
+    mycursor.execute(Q1, Equity_Data)
     db.commit()
+          
+def refresh():
+     
+    update_stocks()
     
-    
-    return load_list, b_list, tablist, graph
-
-def port_display(UserID):
-    print("\nloading...\n")
-    
-    data = port_load(UserID)
-    b_list = data[1]
-    tablist = data[2]
-    graph = data[3]
-    
-    
-    if not tablist:
-        print("No stock data yet.")    
-    else:
-        table = tabulate(tablist, headers=['Stock', 'Shares', 'Average Cost', "Total Cost", 'Equity', 'Profit', '% return'], tablefmt='orgtbl')
-        print(table)
-
-    df = DataFrame (graph,columns=['Date','Balance'])
-    df['Balance'] = df['Balance'].astype(float)
-    df.plot(x = 'Date', y = 'Balance')
-    plt.show()
-    
-    
-    Balance = float(b_list[0])
-    Profit = float(b_list[1])
-    Return = float(b_list[2])
-    print("\nCurrent Balance: ${:0.2f}\nTotal Profit/Loss: ${:0.2f}\nTotal Pecent Return: {:0.4f}%\n".format(Balance, Profit, Return))
-    
-    
-
-def rank_info():
-    
-    print("\nLoading...\n")
-    
-    id_list =[]
+    Users = []
     mycursor.execute("SELECT UserID FROM User")
     for x in mycursor:
-        id_list.append(x[-1])
-    
-    ##########################################################################
-    ## REFRESH BALANCE DATA FOR EVERY USER  IN SYSTEM....  ###################
-    ## MORE ACCURATE REANKING, MAKES PROGRAM RUN SLOW AF...###################
+        Users.append(x[0])
         
-    for ID in id_list:
-        port_load(ID)
-        
-    #########################################################################
+    for UserID in Users:
+        update_equity(UserID)
+
     
-    Balance_list = []
-    for ID in id_list:
-        mycursor.execute("SELECT User.user_name, User_Balance.Balance, User_Balance.percent_return FROM User, User_Balance WHERE User.UserID ={} AND User_Balance.UserID = {} ORDER BY balID DESC LIMIT 1".format(ID,ID))
-        for x in mycursor:
-            l = [ID, x]
-            Balance_list.append(l)
+def show_table(UserID):    
+    
+    Table_Data = []
+    mycursor.execute("SELECT Portfolio.stock, shares, total_cost, avg_cost_per, price FROM Portfolio INNER JOIN Stocks ON Portfolio.stock = Stocks.stock WHERE UserID = {}".format(UserID))
+    for x in mycursor:
+        Stock = x[0]
+        Shares = x[1]
+        if not Shares:
+            continue 
+        
+        Total_Cost = float(x[2])
+        Avg_Cost = float(x[3])
+        Market = float(x[4])
+        Equity = float(Shares * Market)
+        Profit = float(Equity - Total_Cost)
+        Return = float(((Equity / Total_Cost) - 1) * 100)
+        
+        Record = [Stock, Shares, "${:0.2f}".format(Total_Cost),"${:0.2f}".format(Avg_Cost), "${:0.2f}".format(Equity), "${:0.2f}".format(Profit), "{:0.4f}%".format(Return)]
+        Table_Data.append(Record)
+    
+    if not Table_Data:
+        print("\nNo stock data yet.")    
+    else:
+        table = tabulate(Table_Data, headers=['Stock', 'Shares', 'Total Cost', 'Average Cost', 'Equity', 'Profit', '% return'], tablefmt='orgtbl')
+        print("\n",table,"\n")
+    
+def show_balance(UserID):
+    
+    Initial = 200000.00
+    mycursor.execute("SELECT Balance FROM Equity WHERE UserID = {}".format(UserID))
+    for x in mycursor:
+        Balance = float(x[0])
+        
+    Profit = float(Balance - Initial)
+    Return = float(((Balance / Initial)- 1) * 100)
+    print("\nCurrent Balance: ${:0.2f}\nTotal Profit/Loss: ${:0.2f}\nTotal Pecent Return: {:0.4f}%\n".format(Balance, Profit, Return))
+
+def show_graph(UserID):
+    
+    Graph_Data = []
+    mycursor.execute("SELECT date_time, Balance FROM Equity WHERE UserID = {}".format(UserID))
+    for x in mycursor:
+        Graph_Data.append(x)
+        
+    df = DataFrame (Graph_Data,columns=['Date','Balance'])
+    df['Balance'] = df['Balance'].astype(float)
+    df.plot(x = 'Date', y = 'Balance')
+
+    plt.show()
+
+def view_portfolio(UserID):
+    
+    update_equity(UserID)
+    show_table(UserID)
+    show_balance(UserID)
+    show_graph(UserID)
+    
      
-    # print(Balance_list)
-    return Balance_list
+    
+def rank_data():
+    
+    Rank_Data = []
+    mycursor.execute("SELECT user_name, balance FROM User INNER JOIN equity ON User.UserID = equity.UserID GROUP BY user_name")
+    for x in mycursor:
+        Rank_Data.append(x) 
+        
+    return Rank_Data
 
 def rank_sort():  
     
-    tup = rank_info()
-    tup.sort(key = lambda x: x[1][2], reverse = True)
+    Initial = 200000.00
+    
+    Rank_Data = rank_data()
+    Rank_Data.sort(key = lambda x: x[1], reverse = True)
         
     import math
     ordinal = lambda n: "%d%s" % (n,"tsnrhtdd"[(math.floor(n/10)%10!=1)*(n%10<4)*n%10::4])
     rank = ([ordinal(n) for n in range(1,100)])
     n = 0
     
-    rank_list = []
-    load_list = []
-    for x in tup:
-        UserID = x[0]
-        user_name = x[1][0]
-        Balance = x[1][1]
-        Return = x[1][2]
-        Rank = rank[n]
-        
-        l = [user_name, Balance, Return, Rank]
-        m = [UserID, Rank]
-        rank_list.append(l)
-        load_list.append(m)
-        n +=1
-        
-    return rank_list, load_list 
-
-def rank_load():
-        
-    Data = rank_sort()
-    rank_list = Data[0]
-    load_list = Data[1]
-    
-    mycursor.execute("SET SQL_SAFE_UPDATES = 0")
-    mycursor.execute("set innodb_lock_wait_timeout=1000")
-    for x in load_list:
-        UserID = x[0]
-        Rank = x[1]
-        mycursor.execute("UPDATE User SET Ranking = '{}' WHERE UserID = {}".format(Rank, UserID))
-    db.commit 
-    mycursor.execute("SET SQL_SAFE_UPDATES = 1")
-
-    
-    return rank_list
-    
-def rank_display():
-    
-    Data = rank_load()
-    
-    rank_list = []
-    for x in Data:      
+    Rank_List = []
+    for x in Rank_Data:
         user_name = x[0]
         Balance = float(x[1])
-        Return = float(x[2])
-        Rank = x[3]
+        Return = float(((Balance / Initial)-1)*100)
+        Rank = rank[n]
+        
         l = [user_name, "${:0.2f}".format(Balance), "{:0.4f}%".format(Return), Rank]
-        rank_list.append(l)
+        Rank_List.append(l)
+        n +=1
+        
+    return Rank_List
+   
+def rank_display():
     
+    Data = rank_sort()
     
     print("\n")    
-    table = tabulate(rank_list, headers=["User", "Balance", "% Return", "Rank"], tablefmt='orgtbl')
+    table = tabulate(Data, headers=["User", "Balance", "% Return", "Rank"], tablefmt='orgtbl')
     print(table,"\n")
     
 
@@ -807,14 +605,14 @@ def print_awards():
     
     coming_awards = [("SHKRELI BRO:","To earn this award, you must be a true pharma bro by owning the most combined equity in pharmaceuticals.")]
     
-    print(colored("AWARDS:\n",attrs=['underline']))
+    print("AWARDS:\n")
     for x in award_list:
-        print(colored(x[0],'cyan'))
+        print(x[0])
         print(x[1],"\n")
         
-    print(colored("COMING AWARDS:\n",attrs=['underline']))
+    print("COMING AWARDS:\n")
     for x in coming_awards:
-        print(colored(x[0],'cyan'))
+        print(x[0])
         print(x[1],"\n")
 
 def suggest_award(UserID):
@@ -822,12 +620,11 @@ def suggest_award(UserID):
     award_name = input("Award Name: ")
     desc = input("Award Description: ")
     
-    now = datetime.now()
-    dt_string = now.strftime("%Y/%m/%d %H:%M:%S")
+    Date_Time = date_time()
     
-    suggestion = [UserID, dt_string, award_name, desc]
+    suggestion = [UserID, award_name, desc, Date_Time]
     
-    Q = "INSERT INTO suggestions (UserID, date_time, award, description) VALUES (%s,%s,%s,%s)"
+    Q = "INSERT INTO suggestions (UserID, award, descript, date_time) VALUES (%s,%s,%s,%s)"
     mycursor.execute(Q, suggestion)
     db.commit()
         
@@ -835,7 +632,7 @@ def suggest_award(UserID):
 
 
 
-def update_user(UserID):
+def update_user_menu(UserID):
     action = input("\n1. update email\n2. update phone number\n3. reset password\n4. exit \n(select an option): ")
         
     if action == "1":
@@ -942,7 +739,7 @@ def update_pw(UserID):
             return return_statement         
         
         else:
-            mycursor.execute("SELECT password FROM USER WHERE UserID = {}".format(UserID))
+            mycursor.execute("SELECT pass_word FROM USER WHERE UserID = {}".format(UserID))
             for x in mycursor:
                 value_check = x[0]
             
@@ -959,7 +756,7 @@ def update_pw(UserID):
                 
                     if new_value == verify_value:
                         mycursor.execute("SET SQL_SAFE_UPDATES = 0")
-                        mycursor.execute("UPDATE USER SET password = '{}' WHERE UserID = {}".format(new_value, UserID))
+                        mycursor.execute("UPDATE USER SET pass_word = '{}' WHERE UserID = {}".format(new_value, UserID))
                         mycursor.execute("SET SQL_SAFE_UPDATES = 1")
                         db.commit()
                         
@@ -1015,8 +812,9 @@ def check_DOB(DOB):
    return True
       
  
-    
 
+
+  
 
 
 def test():
@@ -1026,15 +824,5 @@ def test():
     
     
     
-# suggest_award()
-# test()
-
-# userload()
-# portload()
-# printtables()
-# login()
-# trunkport()
-# trunkuser()
-# trunkbal()
-# describetable()
+# rank_display()
 
