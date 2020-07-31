@@ -5,6 +5,8 @@ Created on Fri Jul 3 17:11:09 2020
 @author: Aaron Goldstein
 """
 
+from cloud_sql_connector import *
+
 ## pulls stonk data from Alpha Vantage API
 import requests
 import alpha_vantage
@@ -16,6 +18,8 @@ ts = TimeSeries(API_KEY, output_format = 'pandas')
 
 ## allows for creation of graphs and charts based on stonk data
 import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.dates as mdates
 
 ## tabulate module formats specified data in print statement table
 from tabulate import tabulate 
@@ -31,16 +35,17 @@ from pandas import DataFrame
 
 import re
 
-## conects to MySQL Database
-import mysql.connector
-db = mysql.connector.connect(
-    host = "localhost",
-    user = "root",
-    passwd = "root",
-    database = "stonkdb"
-    )
-## iterates through MySQL data stored in tables
-mycursor = db.cursor(buffered=True)
+import pymysql
+
+# import mysql.connector
+# db = mysql.connector.connect(
+#     host = "localhost",
+#     user = "root",
+#     passwd = "root",
+#     database = "stonkdb"
+#     )
+
+# mycursor = db.cursor(buffered=True)
 
 ##############################################################################
 ##############################################################################
@@ -53,17 +58,19 @@ def date_time():
     return Date_Time
 
 def API_call(Stonk):
-
+    
+    Date_Time = date_time()
+    mycursor.execute("INSERT INTO api_calls (date_time) VALUES('{}')".format(Date_Time))
+    db.commit()
+    
     while True:
-        
         try:
             values_1, columns = ts.get_intraday(symbol = Stonk)
             return values_1
-        
         except ValueError:
             continue
     
-
+ 
 # retrieve user input for creating user account
 def user_info():    
 
@@ -235,17 +242,17 @@ def purchase_order(UserID):
                         else:
                             
                             print('\nYou dont have enough money.')
-                            
                             continue
                         
                     else:
                         Buy = False
                         break
-                    
+                 
                 elif Action == '2':
                   
-                    continue
-        
+                    break
+                continue
+            
 def sale_order(UserID):   
     
     mycursor.execute("SELECT cash FROM User WHERE UserID = {}".format(UserID))
@@ -256,21 +263,25 @@ def sale_order(UserID):
     while Trade == True: 
         
         Stock = input("Which stock would you like to sell?\n(Insert stock ticker. Press '%' to cancel.):")
+        mycursor.execute("SELECT * FROM Portfolio WHERE Stock = '{}' AND UserID = {}".format(Stock, UserID))
+        row_count = mycursor.rowcount
         
         if Stock == '%':
-            
             Trade = False
             Order = "false"
             return Order
         
+        if row_count == 0:
+            print("\nYou do not own any shares of {}".format(Stock))
+            continue
+            
         else:
             
             Data = API_call(Stock)
             Data['4. close']
             Price = float(Data['4. close'][0])
-            
             Total_Shares = sum_col('shares', 'Portfolio', 'stock', Stock, UserID)
-            
+
             Sell = True
             while Sell == True:
                
@@ -813,16 +824,91 @@ def check_DOB(DOB):
       
  
 
+def day():
+
+    Now = datetime.now()
+    Date = Now.strftime("%m/%d/%Y")
+    Min = Date + " 08:30:00"
+    Max = Date + " 16:00:00"
+    
+   
+    Min = datetime.strptime(Min, '%m/%d/%Y %H:%M:%S')
+    Max = datetime.strptime(Max, '%m/%d/%Y %H:%M:%S')
+    
+    
+    return Min, Max
+    
+# def week():
+    
+# def month():
+
+# def 3month():
+    
+# def year():
+    
+# def 5year():
+    
+def graph_test():
+    
+    # years = mdates.YearLocator()   # every year
+    # months = mdates.MonthLocator()  # every month
+    # week = mdates.WeekdayLocator()
+    # hour = mdates.HourLocator()
+    # minute = mdates.MinuteLocator()
+    
+    # years_fmt = mdates.DateFormatter('%Y')
+    
+    # Range = day()
+    # Min = Range[0]
+    # Max = Range[1]
+    
+    
+    # data = []
+    # mycursor.execute("SELECT date_time, Balance FROM Equity WHERE UserID = {}".format(UserID))
+    # for x in mycursor:
+    #     data.append(x)
+    
+    # df = DataFrame (data,columns=['Date','Balance'])
+    # df['Balance'] = df['Balance'].astype(float)
+    # df.plot(x = 'Date', y = 'Balance')
+    # # fig, df = plt.subplots()
+    # # fig.autofmt_xdate()
+    # df.set_xlim([datetime.date(Min), datetime.date(Max)])
+    # # df.set_ylim([0, 5])
+    # plt.show()
+    
+    # format the ticks
+    # df.xaxis.set_major_locator(years)
+    # df.xaxis.set_major_formatter(years_fmt)
+    # df.xaxis.set_minor_locator(months)
+    
+    # ## round to nearest years.
+    # # datemin = np.datetime64(data['Date'][0], 'Y')
+    # # datemax = np.datetime64(data['Date'][1], 'Y') + np.timedelta64(1, 'Y')
+    # # df.set_xlim(datemin, datemax)
+    
+    # # format the coords message box
+    # df.format_xdata = mdates.DateFormatter('%Y-%m-%d')
+    # df.format_ydata = lambda x: '$%1.2f' % x  # format the price.
+    # df.grid(True)
+    
+    # # rotates and right aligns the x labels, and moves the bottom of the
+    # # axes up to make room for them
+    # fig.autofmt_xdate()
+    
+    plt.show()
 
   
 
 
 def test():
-    DOB = ("07/27/1995")
-    DOB = datetime.strptime(DOB, "%m/%d/%Y")
-    print(DOB)
     
+    UserID = 1
+    Stock = 'ibm'
+    Total_Shares = sum_col('shares', 'Portfolio', 'stock', Stock, UserID)
+    print(Total_Shares)
+
     
-    
+
 # rank_display()
 

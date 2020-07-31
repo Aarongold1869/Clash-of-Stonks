@@ -340,7 +340,7 @@ def day():
     
 # def 5year():
     
-def test():
+def graph_test():
     
     years = mdates.YearLocator()   # every year
     months = mdates.MonthLocator()  # every month
