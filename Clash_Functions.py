@@ -4,6 +4,37 @@ Created on Fri Jul 3 17:11:09 2020
 
 @author: Aaron Goldstein
 """
+import os
+import sqlalchemy
+
+# Remember - storing secrets in plaintext is potentially unsafe. Consider using
+# something like https://cloud.google.com/secret-manager/docs/overview to help keep
+# secrets secret.
+db_user = os.environ["root"]
+db_pass = os.environ["123"]
+db_name = os.environ["stonkdb"]
+db_socket_dir = os.environ.get("127.0.0.1", "/cloudsql")
+cloud_sql_connection_name = os.environ["august-monument-283304:us-central1:clashdb"]
+
+pool = sqlalchemy.create_engine(
+    # Equivalent URL:
+    # mysql+pymysql://<db_user>:<db_pass>@/<db_name>?unix_socket=<socket_path>/<cloud_sql_instance_name>
+    sqlalchemy.engine.url.URL(
+        drivername="mysql+pymysql",
+        username=db_user,  # e.g. "my-database-user"
+        password=db_pass,  # e.g. "my-database-password"
+        database=db_name,  # e.g. "my-database-name"
+        query={
+            "unix_socket": "{}/{}".format(
+                db_socket_dir,  # e.g. "/cloudsql"
+                cloud_sql_connection_name)  # i.e "august-monument-283304:us-central1:clashdb"
+        }
+    ),
+    # ... Specify additional properties here.
+
+)
+
+
 
 ## pulls stonk data from Alpha Vantage API
 import requests
