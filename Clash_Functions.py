@@ -5,8 +5,6 @@ Created on Fri Jul 3 17:11:09 2020
 @author: Aaron Goldstein
 """
 
-from cloud_sql_connector import *
-
 ## pulls stonk data from Alpha Vantage API
 import requests
 import alpha_vantage
@@ -37,7 +35,7 @@ import re
 
 import pymysql
 
-# import mysql.connector
+import mysql.connector
 # db = mysql.connector.connect(
 #     host = "localhost",
 #     user = "root",
@@ -45,7 +43,14 @@ import pymysql
 #     database = "stonkdb"
 #     )
 
-# mycursor = db.cursor(buffered=True)
+db = mysql.connector.connect(
+    host = "127.0.0.1",
+    user = "root",
+    passwd = "123",
+    database = "stonkdb"
+    )
+
+mycursor = db.cursor(buffered=True)
 
 ##############################################################################
 ##############################################################################
@@ -113,7 +118,13 @@ def user_info():
              continue
          break
     
-    password = input("Create a password: ")
+    while True:
+         password = input("Create a password: ")
+         valid = check_pw(password)
+         if valid == False:
+             continue
+         break
+    
     Date_Time = date_time()
     Cash = 200000.00
     
@@ -133,7 +144,7 @@ def user_info():
     Introduction = "\nHey {}! You have ${:0.2f} to invest. Let's get started!".format(user_name, Cash)
     print(Introduction)
     
-    mycursor.execute("SELECT UserID FROM User WHERE user_name = '{}'".format(user_name))
+    mycursor.execute("SELECT UserID FROM user WHERE user_name = '{}'".format(user_name))
     for x in mycursor:
         UserID = x[0]
     
@@ -142,7 +153,7 @@ def user_info():
 # create user record in User table
 def user_load(User_Info):
 
-    User_Load = "INSERT INTO User (first_name, last_name, DOB, email, phone, user_name, pass_word, date_time, cash) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)"  
+    User_Load = "INSERT INTO user (first_name, last_name, DOB, email, phone, user_name, pass_word, date_time, cash) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)"  
     for x, user in enumerate(User_Info):
         mycursor.execute(User_Load, user)  
     db.commit()
@@ -155,7 +166,7 @@ def login():
         user_name = input("Username: ")
         password = input("Password: ")
         
-        mycursor.execute("SELECT UserID FROM User WHERE user_name = '{}' AND pass_word = '{}'".format(user_name,password))
+        mycursor.execute("SELECT UserID FROM user WHERE user_name = '{}' AND pass_word = '{}'".format(user_name,password))
         for x in mycursor:
             UserID = x[0]
     
@@ -181,7 +192,7 @@ def login():
 # retreive purchase info from User input 
 def purchase_order(UserID):                            
     
-    mycursor.execute("SELECT cash FROM User WHERE UserID = {}".format(UserID))
+    mycursor.execute("SELECT cash FROM user WHERE UserID = {}".format(UserID))
     for x in mycursor:
         Cash = float(x[0])
     Cash_string = "You have ${:0.2f}".format(Cash)
@@ -255,7 +266,7 @@ def purchase_order(UserID):
             
 def sale_order(UserID):   
     
-    mycursor.execute("SELECT cash FROM User WHERE UserID = {}".format(UserID))
+    mycursor.execute("SELECT cash FROM user WHERE UserID = {}".format(UserID))
     for x in mycursor:
         Cash = float(x[0])
     
@@ -263,7 +274,7 @@ def sale_order(UserID):
     while Trade == True: 
         
         Stock = input("Which stock would you like to sell?\n(Insert stock ticker. Press '%' to cancel.):")
-        mycursor.execute("SELECT * FROM Portfolio WHERE Stock = '{}' AND UserID = {}".format(Stock, UserID))
+        mycursor.execute("SELECT * FROM portfolio WHERE stock = '{}' AND UserID = {}".format(Stock, UserID))
         row_count = mycursor.rowcount
         
         if Stock == '%':
@@ -280,7 +291,7 @@ def sale_order(UserID):
             Data = API_call(Stock)
             Data['4. close']
             Price = float(Data['4. close'][0])
-            Total_Shares = sum_col('shares', 'Portfolio', 'stock', Stock, UserID)
+            Total_Shares = sum_col('shares', 'portfolio', 'stock', Stock, UserID)
 
             Sell = True
             while Sell == True:
@@ -321,7 +332,7 @@ def sale_order(UserID):
         
 def submit_order(Order):
       
-    Order_load = "INSERT INTO Orders (UserID, stock, shares, cost_per, date_time) VALUES (%s,%s,%s,%s,%s)"
+    Order_load = "INSERT INTO orders (UserID, stock, shares, cost_per, date_time) VALUES (%s,%s,%s,%s,%s)"
     mycursor.execute(Order_load, Order)
     db.commit()
 
@@ -330,33 +341,33 @@ def update_portfolio(UserID):
     Date_Time = date_time()
     
     Stock_List = []
-    mycursor.execute("SELECT stock FROM Orders WHERE UserID = {}".format(UserID))
+    mycursor.execute("SELECT stock FROM orders WHERE UserID = {}".format(UserID))
     for x in mycursor:
         Stock_List.append(x[0])
     Stock_List = list(dict.fromkeys(Stock_List))
     
     for Stock in Stock_List:
-        Shares = sum_col('shares', 'Orders', 'stock', Stock, UserID)
-        Total_Cost = sum_col("investment", 'Orders', 'stock', Stock, UserID)
+        Shares = sum_col('shares', 'orders', 'stock', Stock, UserID)
+        Total_Cost = sum_col("investment", 'orders', 'stock', Stock, UserID)
 
         mycursor.execute("SELECT * FROM Portfolio WHERE Stock = '{}' AND UserID = {}".format(Stock, UserID))
         row_count = mycursor.rowcount
         
         if row_count == 0:
             Stock_Info = [UserID, Stock, Shares, Total_Cost, Date_Time]
-            Q1 = ("INSERT INTO Portfolio (UserID, stock, shares, total_cost, date_time) VALUES(%s,%s,%s,%s,%s)")
+            Q1 = ("INSERT INTO portfolio (UserID, stock, shares, total_cost, date_time) VALUES(%s,%s,%s,%s,%s)")
             mycursor.execute(Q1, Stock_Info)
             db.commit()
         
         else:
-            mycursor.execute("UPDATE Portfolio SET shares = {}, total_cost = {}, date_time = '{}' WHERE stock = '{}' AND UserID = {}".format(Shares, Total_Cost, Date_Time, Stock, UserID))
+            mycursor.execute("UPDATE portfolio SET shares = {}, total_cost = {}, date_time = '{}' WHERE stock = '{}' AND UserID = {}".format(Shares, Total_Cost, Date_Time, Stock, UserID))
             db.commit()
 
         remove_stock(Stock)
     
 def update_cash(Cash, UserID):
     
-    mycursor.execute("UPDATE USER SET cash = {} WHERE UserID = {}".format(Cash, UserID))    
+    mycursor.execute("UPDATE user SET cash = {} WHERE UserID = {}".format(Cash, UserID))    
     db.commit()
         
 
@@ -370,7 +381,7 @@ def sum_col(Select, Table, Column, Value, UserID):
 
 def share_count(Stock):
         
-    mycursor.execute("SELECT SUM(shares) FROM Orders WHERE Stock = '{}'".format(Stock))
+    mycursor.execute("SELECT SUM(shares) FROM orders WHERE stock = '{}'".format(Stock))
     for x in mycursor:
         Total_Shares = x[0]
     
@@ -378,7 +389,7 @@ def share_count(Stock):
 
 def user_share_count(Stock, UserID):
     
-    mycursor.execute("SELECT SUM(shares) FROM Orders WHERE Stock = '{}' AND UserID = {}".format(Stock, UserID))
+    mycursor.execute("SELECT SUM(shares) FROM orders WHERE stock = '{}' AND UserID = {}".format(Stock, UserID))
     for x in mycursor:
         Total_Shares = x[0]
     
@@ -386,13 +397,13 @@ def user_share_count(Stock, UserID):
     
 def remove_stock(Stock):
     
-    mycursor.execute("SELECT SUM(shares) FROM Portfolio WHERE Stock = '{}'".format(Stock))
+    mycursor.execute("SELECT SUM(shares) FROM portfolio WHERE stock = '{}'".format(Stock))
     for x in mycursor:
         Total_Shares = x
     
     if Total_Shares == 0:
         mycursor.execute("SET SQL_SAFE_UPDATES = 0")
-        mycursor.execute("DELETE FROM Portfolio WHERE stock = '{}'".format(Stock))
+        mycursor.execute("DELETE FROM portfolio WHERE stock = '{}'".format(Stock))
         mycursor.execute("SET SQL_SAFE_UPDATES = 1")
         db.commit()
 
@@ -401,17 +412,17 @@ def load_stock(Stock, Price):
     
     Date_Time = date_time()
 
-    mycursor.execute("SELECT * FROM Stocks WHERE Stock = '{}'".format(Stock))
+    mycursor.execute("SELECT * FROM stocks WHERE Stock = '{}'".format(Stock))
     row_count = mycursor.rowcount
    
     if row_count == 0:  
         Stock_Info = [Stock, Price, Date_Time]
-        Q1 = ("INSERT INTO Stocks (stock, price, date_time) VALUES(%s,%s,%s)")
+        Q1 = ("INSERT INTO stocks (stock, price, date_time) VALUES(%s,%s,%s)")
         mycursor.execute(Q1, Stock_Info)
         db.commit()
     
     else:
-        mycursor.execute("UPDATE Stocks SET price = {}, date_time = '{}' WHERE stock = '{}'".format(Price, Date_Time, Stock))
+        mycursor.execute("UPDATE stocks SET price = {}, date_time = '{}' WHERE stock = '{}'".format(Price, Date_Time, Stock))
         db.commit()
     
 def update_stocks():
@@ -419,7 +430,7 @@ def update_stocks():
     Date_Time = date_time()
     
     Stock_List = []
-    mycursor.execute("SELECT stock FROM Portfolio")
+    mycursor.execute("SELECT stock FROM portfolio")
     for x in mycursor:
         Stock_List.append(x[0])
     Stock_List = list(dict.fromkeys(Stock_List))
@@ -433,17 +444,17 @@ def update_stocks():
         Data = API_call(Stock)
         Market = float(Data['4. close'][0])
 
-        mycursor.execute("SELECT * FROM Stocks WHERE Stock = '{}'".format(Stock))
+        mycursor.execute("SELECT * FROM stocks WHERE stock = '{}'".format(Stock))
         row_count = mycursor.rowcount
         
         if row_count == 0:
             Stock_Info = [Stock, Market, Date_Time]
-            Q1 = ("INSERT INTO Stocks (stock, price, date_time) VALUES(%s,%s,%s)")
+            Q1 = ("INSERT INTO stocks (stock, price, date_time) VALUES(%s,%s,%s)")
             mycursor.execute(Q1, Stock_Info)
             db.commit()
         
         else:
-            mycursor.execute("UPDATE Stocks SET price = {}, date_time = '{}' WHERE stock = '{}'".format(Market, Date_Time, Stock))
+            mycursor.execute("UPDATE stocks SET price = {}, date_time = '{}' WHERE stock = '{}'".format(Market, Date_Time, Stock))
             db.commit()
   
 def update_equity(UserID):
@@ -451,16 +462,16 @@ def update_equity(UserID):
     Equity = 0
     Date_Time = date_time() 
     
-    mycursor.execute("SELECT cash FROM User WHERE UserID = {}".format(UserID))
+    mycursor.execute("SELECT cash FROM user WHERE UserID = {}".format(UserID))
     for x in mycursor:
         Cash = x[0]
     
-    mycursor.execute("SELECT (shares * price) FROM Portfolio INNER JOIN Stocks ON Portfolio.stock = Stocks.stock WHERE UserID = {}".format(UserID))
+    mycursor.execute("SELECT (shares * price) FROM portfolio INNER JOIN stocks ON portfolio.stock = stocks.stock WHERE UserID = {}".format(UserID))
     for x in mycursor:
         Equity = Equity + x[0]
        
     Equity_Data = [UserID, Equity, Cash, Date_Time]
-    Q1 = "INSERT INTO Equity (UserID, equity, cash, date_time) VALUES (%s,%s,%s,%s)"
+    Q1 = "INSERT INTO equity (UserID, equity, cash, date_time) VALUES (%s,%s,%s,%s)"
     mycursor.execute(Q1, Equity_Data)
     db.commit()
           
@@ -469,7 +480,7 @@ def refresh():
     update_stocks()
     
     Users = []
-    mycursor.execute("SELECT UserID FROM User")
+    mycursor.execute("SELECT UserID FROM user")
     for x in mycursor:
         Users.append(x[0])
         
@@ -480,7 +491,7 @@ def refresh():
 def show_table(UserID):    
     
     Table_Data = []
-    mycursor.execute("SELECT Portfolio.stock, shares, total_cost, avg_cost_per, price FROM Portfolio INNER JOIN Stocks ON Portfolio.stock = Stocks.stock WHERE UserID = {}".format(UserID))
+    mycursor.execute("SELECT portfolio.stock, shares, total_cost, avg_cost_per, price FROM portfolio INNER JOIN stocks ON portfolio.stock = stocks.stock WHERE UserID = {}".format(UserID))
     for x in mycursor:
         Stock = x[0]
         Shares = x[1]
@@ -506,7 +517,7 @@ def show_table(UserID):
 def show_balance(UserID):
     
     Initial = 200000.00
-    mycursor.execute("SELECT Balance FROM Equity WHERE UserID = {}".format(UserID))
+    mycursor.execute("SELECT Balance FROM equity WHERE UserID = {}".format(UserID))
     for x in mycursor:
         Balance = float(x[0])
         
@@ -517,7 +528,7 @@ def show_balance(UserID):
 def show_graph(UserID):
     
     Graph_Data = []
-    mycursor.execute("SELECT date_time, Balance FROM Equity WHERE UserID = {}".format(UserID))
+    mycursor.execute("SELECT date_time, Balance FROM equity WHERE UserID = {}".format(UserID))
     for x in mycursor:
         Graph_Data.append(x)
         
@@ -529,7 +540,8 @@ def show_graph(UserID):
 
 def view_portfolio(UserID):
     
-    update_equity(UserID)
+    refresh()
+    # update_equity(UserID)
     show_table(UserID)
     show_balance(UserID)
     show_graph(UserID)
@@ -539,7 +551,8 @@ def view_portfolio(UserID):
 def rank_data():
     
     Rank_Data = []
-    mycursor.execute("SELECT user_name, balance FROM User INNER JOIN equity ON User.UserID = equity.UserID GROUP BY user_name")
+    mycursor.execute("SET SESSION sql_mode=''")
+    mycursor.execute("SELECT user_name, Balance FROM user INNER JOIN equity ON user.UserID = equity.UserID GROUP BY user_name")
     for x in mycursor:
         Rank_Data.append(x) 
         
@@ -677,7 +690,7 @@ def update_email(UserID):
         
             if new_email == verify_email:
                 mycursor.execute("SET SQL_SAFE_UPDATES = 0")
-                mycursor.execute("UPDATE USER SET email = '{}' WHERE UserID = {}".format(new_email, UserID))
+                mycursor.execute("UPDATE user SET email = '{}' WHERE UserID = {}".format(new_email, UserID))
                 mycursor.execute("SET SQL_SAFE_UPDATES = 1")
                 db.commit()
                 
@@ -717,7 +730,7 @@ def update_phone(UserID):
         
             if new_value == verify_value:
                 mycursor.execute("SET SQL_SAFE_UPDATES = 0")
-                mycursor.execute("UPDATE USER SET phone = '{}' WHERE UserID = {}".format(new_value, UserID))
+                mycursor.execute("UPDATE user SET phone = '{}' WHERE UserID = {}".format(new_value, UserID))
                 mycursor.execute("SET SQL_SAFE_UPDATES = 1")
                 db.commit()
                 
@@ -750,7 +763,7 @@ def update_pw(UserID):
             return return_statement         
         
         else:
-            mycursor.execute("SELECT pass_word FROM USER WHERE UserID = {}".format(UserID))
+            mycursor.execute("SELECT pass_word FROM user WHERE UserID = {}".format(UserID))
             for x in mycursor:
                 value_check = x[0]
             
@@ -761,13 +774,16 @@ def update_pw(UserID):
             else:
             
                while True:
-        
-                    new_value = input("Enter new password: ")
+                   
+                    new_value = input("Create a password: ")
+                    valid = check_pw(new_value)
+                    if valid == False:
+                        continue
                     verify_value = input("Verify password: ")
                 
                     if new_value == verify_value:
                         mycursor.execute("SET SQL_SAFE_UPDATES = 0")
-                        mycursor.execute("UPDATE USER SET pass_word = '{}' WHERE UserID = {}".format(new_value, UserID))
+                        mycursor.execute("UPDATE user SET pass_word = '{}' WHERE UserID = {}".format(new_value, UserID))
                         mycursor.execute("SET SQL_SAFE_UPDATES = 1")
                         db.commit()
                         
@@ -792,10 +808,10 @@ def check_email(email):
     regex = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'
 
     if(re.search(regex,email)):  
-        return "True" 
+        return True
           
     else:  
-        return "False" 
+        return False
 
 def check_phone(phone):
     
@@ -804,7 +820,7 @@ def check_phone(phone):
     
 def check_user_name(user_name):
     
-    mycursor.execute("SELECT user_name FROM User")
+    mycursor.execute("SELECT user_name FROM user")
         
     while True:
         for x in mycursor:
@@ -812,6 +828,18 @@ def check_user_name(user_name):
                 return False
         
         return True
+    
+def check_pw(password):
+    
+    regex = "^.*(?=.{8,})(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=]).*$"
+    
+    if (re.findall(regex,password)):
+        return True
+    
+    else:
+        print("Password must contain at least 8 characters\nMust be restricted to, though does not specifically require any of:\nuppercase letters: A-Z\nlowercase letters: a-z\nnumbers: 0-9\nany of the special characters: @#$%^&+=")
+        return False
+        
 
 def check_DOB(DOB):
     
@@ -903,12 +931,15 @@ def graph_test():
 
 def test():
     
-    UserID = 1
-    Stock = 'ibm'
-    Total_Shares = sum_col('shares', 'Portfolio', 'stock', Stock, UserID)
-    print(Total_Shares)
+    while True:
+         password = input("Create a password: ")
+         valid = check_pw(password)
+         if valid == False:
+             continue
+         else:
+             break
 
-    
+
 
 # rank_display()
 

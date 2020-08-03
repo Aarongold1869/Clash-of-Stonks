@@ -99,3 +99,21 @@ runfile('C:/Users/Aaron Goldstein/.spyder-py3/Stonk_Clash.py', wdir='C:/Users/Aa
 runfile('C:/Users/Aaron Goldstein/.spyder-py3/cloud_sql_connector.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
 %tb
 runfile('C:/Users/Aaron Goldstein/.spyder-py3/cloud_sql_connector.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+
+## ---(Fri Jul 31 13:37:12 2020)---
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/cloud_sql_connector.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+%tb
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/cloud_sql_connector.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/untitled0.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Stonk_Clash.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Clash_Functions.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Stonk_Clash.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Clash_Functions.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+Agold123
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Clash_Functions.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Stonk_Clash.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Clash_Functions.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Stonk_Clash.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Clash_Functions.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/Stonk_Clash.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')
+runfile('C:/Users/Aaron Goldstein/.spyder-py3/untitled1.py', wdir='C:/Users/Aaron Goldstein/.spyder-py3')

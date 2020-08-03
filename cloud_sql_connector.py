@@ -6,8 +6,15 @@ from flask import Flask, render_template, request, Response
 import sqlalchemy
 
 
-app = Flask(__name__)
 
+import pymysql
+connection = pymysql.connect(host='127.0.0.1',
+                             user='root',
+                             password='',
+                             db='stonkdb')
+
+
+app = Flask(__name__)
 
 
 if __name__ == "__main__":
